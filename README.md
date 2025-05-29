@@ -1,0 +1,1 @@
+Criação de um jogo inspirado em Parachute (1981), com foco em coleta de lixo!
