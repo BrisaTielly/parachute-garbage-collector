@@ -1,7 +1,16 @@
 #include <GL/glut.h>
+#include <cstdio> // Para sprintf (para exibir a pontuação no título)
 #include <cstdlib> // Para rand() e srand()
 #include <ctime>   // Para time()
+#include <string>  // Para std::to_string (alternativa para sprintf)
 #include <vector>
+
+// --- Variáveis Globais para limites da tela ---
+float screenMinX = -1.0f;
+float screenMaxX = 1.0f;
+// float screenMinY = -1.0f; // Não usado diretamente neste exemplo, mas bom
+// saber float screenMaxY = 1.0f; // Não usado diretamente neste exemplo, mas
+// bom saber
 
 // Estrutura para representar um objeto caindo
 struct FallingObject {
@@ -11,11 +20,8 @@ struct FallingObject {
   float r, g, b; // Cor
 
   FallingObject() {
-    respawn();
     size = 0.05f; // Tamanho fixo para este exemplo
-    r = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
-    g = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
-    b = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+    respawn();    // Chama respawn para definir posição inicial e cor
   }
 
   void respawn() {
@@ -26,11 +32,16 @@ struct FallingObject {
     speed =
         0.002f +
         (static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) * 0.005f;
+    // Cor aleatória no respawn também
+    r = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+    g = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+    b = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
   }
 
   void update() {
     y -= speed;
-    if (y < -1.0f - size) { // Se saiu da tela por baixo
+    // Se saiu da tela por baixo (não foi pego pela cesta)
+    if (y < -1.0f - size) {
       respawn();
     }
   }
@@ -46,16 +57,77 @@ struct FallingObject {
   }
 };
 
+// Estrutura para representar a cesta
+struct Basket {
+  float x, y;          // Posição do centro da cesta
+  float width, height; // Dimensões da cesta
+  float r, g, b;       // Cor da cesta
+  float speed;         // Velocidade de movimento da cesta
+
+  Basket() {
+    width = 0.25f;
+    height = 0.08f;
+    x = 0.0f;                  // Começa no centro
+    y = -0.9f + height / 2.0f; // Posição Y fixa na parte inferior
+    r = 0.8f;
+    g = 0.8f;
+    b = 0.8f; // Cor cinza claro
+    speed = 0.07f;
+  }
+
+  void draw() {
+    glColor3f(r, g, b);
+    glBegin(GL_QUADS);
+    glVertex2f(x - width / 2, y - height / 2);
+    glVertex2f(x + width / 2, y - height / 2);
+    glVertex2f(x + width / 2, y + height / 2);
+    glVertex2f(x - width / 2, y + height / 2);
+    glEnd();
+  }
+
+  void
+  move(float direction) { // direction será -1 para esquerda, 1 para direita
+    x += direction * speed;
+
+    // Limitar o movimento da cesta dentro da tela
+    if (x - width / 2 < screenMinX) {
+      x = screenMinX + width / 2;
+    }
+    if (x + width / 2 > screenMaxX) {
+      x = screenMaxX - width / 2;
+    }
+  }
+};
+
 // --- Variáveis Globais ---
 std::vector<FallingObject> objects;
-const int NUM_OBJECTS = 15;
+const int NUM_OBJECTS = 10; // Aumentei um pouco para mais diversão
+Basket basket;
+int score = 0;
 int windowWidth = 600;
 int windowHeight = 800;
+
+// --- Funções Auxiliares ---
+void updateWindowTitle() {
+  char title[100];
+  sprintf(title, "Objetos Caindo - Pontos: %d", score);
+  glutSetWindowTitle(title);
+}
+
+// Função para desenhar texto na tela
+void renderText(float x, float y, void *font, const char *string) {
+  glRasterPos2f(x, y);
+  while (*string) {
+    glutBitmapCharacter(font, *string);
+    string++;
+  }
+}
 
 // --- Funções OpenGL ---
 
 void initGL() {
   glClearColor(0.1f, 0.1f, 0.2f, 1.0f); // Cor de fundo azul escuro
+  updateWindowTitle(); // Define o título inicial com a pontuação
 }
 
 void display() {
@@ -66,6 +138,15 @@ void display() {
     objects[i].draw();
   }
 
+  // Desenha a cesta
+  basket.draw();
+
+  // Desenha a pontuação na tela
+  char scoreText[50];
+  sprintf(scoreText, "Pontos: %d", score);
+  glColor3f(1.0f, 1.0f, 1.0f); // Cor branca para o texto
+  renderText(-0.95f, 0.9f, GLUT_BITMAP_HELVETICA_18, scoreText);
+
   glutSwapBuffers(); // Troca os buffers (double buffering)
 }
 
@@ -73,6 +154,36 @@ void update(int value) {
   // Atualiza a posição de todos os objetos
   for (size_t i = 0; i < objects.size(); ++i) {
     objects[i].update();
+
+    // Detecção de colisão com a cesta
+    float obj_left = objects[i].x - objects[i].size / 2;
+    float obj_right = objects[i].x + objects[i].size / 2;
+    float obj_bottom = objects[i].y - objects[i].size / 2;
+    float obj_top =
+        objects[i].y +
+        objects[i].size / 2; // Não usado na colisão abaixo, mas bom ter
+
+    float basket_left = basket.x - basket.width / 2;
+    float basket_right = basket.x + basket.width / 2;
+    float basket_top = basket.y + basket.height / 2;
+    float basket_bottom = basket.y - basket.height / 2;
+
+    // Condição de colisão:
+    // O objeto está horizontalmente sobre a cesta E
+    // a base do objeto tocou ou passou um pouco abaixo do topo da cesta E
+    // o objeto ainda não passou completamente pela cesta (seu topo está acima
+    // da base da cesta)
+    if (obj_right > basket_left && obj_left < basket_right &&
+        obj_bottom <= basket_top &&
+        obj_bottom >=
+            basket_bottom -
+                objects[i].size) { // A última condição evita que conte
+                                   // multiplas vezes se o objeto for muito
+                                   // rápido ou o fps baixo
+      objects[i].respawn();
+      score++;
+      updateWindowTitle();
+    }
   }
 
   glutPostRedisplay(); // Marca a janela atual para ser redesenhada
@@ -82,42 +193,35 @@ void update(int value) {
 
 void reshape(GLsizei width, GLsizei height) {
   if (height == 0)
-    height = 1; // Previne divisão por zero
+    height = 1;        // Previne divisão por zero
+  windowWidth = width; // Atualiza as dimensões globais da janela
+  windowHeight = height;
   float aspect = (float)width / (float)height;
 
   glViewport(0, 0, width, height);
 
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
-  // Mantém a proporção da cena se a janela for redimensionada
-  if (width >= height) {
-    // Coordenadas x de -aspect a aspect, y de -1 a 1
-    gluOrtho2D(-1.0 * aspect, 1.0 * aspect, -1.0, 1.0);
-  } else {
-    // Coordenadas x de -1 a 1, y de -1/aspect a 1/aspect
-    gluOrtho2D(-1.0, 1.0, -1.0 / aspect, 1.0 / aspect);
-  }
-  // A origem (0,0) é o centro. Y vai de -1 (baixo) a 1 (topo). X vai de -aspect
-  // a aspect. No nosso caso, como o respawn é entre -1 e 1 no X, e o desenho
-  // dos objetos também é nesse intervalo, a lógica de gluOrtho2D acima garante
-  // que a área visível seja adaptada. Para manter a simplicidade do respawn em
-  // x (-1 a 1), é melhor usar glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0); e
-  // deixar que os objetos fiquem "esticados" ou "achatados" se a janela não for
-  // quadrada, ou ajustar o respawn do x para considerar o aspect ratio. Para
-  // este protótipo simples, vamos manter o padrão de -1 a 1 que o GLUT
-  // estabeleceria por padrão se não chamássemos gluOrtho2D explicitamente,
 
-  // Vamos usar uma projeção ortográfica simples de -1 a 1 para X e Y.
-  // Isso significa que o canto inferior esquerdo é (-1,-1) e o superior direito
-  // é (1,1).
-  glMatrixMode(GL_PROJECTION);
-  glLoadIdentity();
-  if (width <= height)
-    gluOrtho2D(-1.0, 1.0, -1.0 * (GLfloat)height / (GLfloat)width,
-               1.0 * (GLfloat)height / (GLfloat)width);
-  else
-    gluOrtho2D(-1.0 * (GLfloat)width / (GLfloat)height,
-               1.0 * (GLfloat)width / (GLfloat)height, -1.0, 1.0);
+  // Ajusta as coordenadas do mundo para manter a proporção
+  // e atualiza os limites da tela para a cesta
+  if (width <= height) {
+    screenMinX = -1.0f;
+    screenMaxX = 1.0f;
+    // screenMinY = -1.0f * (GLfloat)height / (GLfloat)width;
+    // screenMaxY = 1.0f * (GLfloat)height / (GLfloat)width;
+    gluOrtho2D(screenMinX, screenMaxX, -1.0f * (GLfloat)height / (GLfloat)width,
+               1.0f * (GLfloat)height / (GLfloat)width);
+  } else {
+    // screenMinY = -1.0f;
+    // screenMaxY = 1.0f;
+    screenMinX = -1.0f * (GLfloat)width / (GLfloat)height;
+    screenMaxX = 1.0f * (GLfloat)width / (GLfloat)height;
+    gluOrtho2D(screenMinX, screenMaxX, -1.0f, 1.0f);
+  }
+  // Garante que a cesta seja reposicionada corretamente se a tela for
+  // redimensionada e ela sair dos limites
+  basket.move(0);
 
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
@@ -128,7 +232,41 @@ void keyboard(unsigned char key, int x, int y) {
   case 27:   // Tecla ESC
     exit(0); // Sai do programa
     break;
+  case '1': // Azul
+    basket.r = 0.0f;
+    basket.g = 0.0f;
+    basket.b = 1.0f;
+    break;
+  case '2': // Vermelho
+    basket.r = 1.0f;
+    basket.g = 0.0f;
+    basket.b = 0.0f;
+    break;
+  case '3': // Amarelo
+    basket.r = 1.0f;
+    basket.g = 1.0f;
+    basket.b = 0.0f;
+    break;
+  case '4': // Verde
+    basket.r = 0.0f;
+    basket.g = 1.0f;
+    basket.b = 0.0f;
+    break;
+  case '5': // Cinza (cor original)
+    basket.r = 0.8f;
+    basket.g = 0.8f;
+    basket.b = 0.8f;
+    break;
+  case 'A':
+  case 'a':
+    basket.move(-1.0f); // Mover para a esquerda
+    break;
+  case 'D':
+  case 'd':
+    basket.move(1.0f); // Mover para a direita
+    break;
   }
+  glutPostRedisplay(); // Redesenha para mostrar a nova cor da cesta
 }
 
 int main(int argc, char **argv) {
@@ -139,6 +277,7 @@ int main(int argc, char **argv) {
   for (int i = 0; i < NUM_OBJECTS; ++i) {
     objects.push_back(FallingObject());
   }
+  // A cesta é inicializada por seu construtor
 
   glutInit(&argc, argv); // Inicializa o GLUT
   glutInitDisplayMode(GLUT_DOUBLE |
@@ -146,13 +285,14 @@ int main(int argc, char **argv) {
   glutInitWindowSize(windowWidth,
                      windowHeight); // Define o tamanho inicial da janela
   glutInitWindowPosition(50, 50);   // Posição inicial da janela
-  glutCreateWindow(
-      "Objetos Caindo - Prototipo GLUT"); // Cria a janela com um título
+  // O título da janela é definido em initGL e atualizado em updateWindowTitle
+  glutCreateWindow("Objetos Caindo");
 
-  glutDisplayFunc(display);   // Registra a função de callback para desenhar
-  glutReshapeFunc(reshape);   // Registra a função de callback para
-                              // redimensionamento da janela
-  glutKeyboardFunc(keyboard); // Registra a função de callback para o teclado
+  glutDisplayFunc(display); // Registra a função de callback para desenhar
+  glutReshapeFunc(reshape); // Registra a função de callback para
+                            // redimensionamento da janela
+  glutKeyboardFunc(
+      keyboard); // Registra a função de callback para o teclado normal
   glutTimerFunc(
       0, update,
       0); // Registra a função de callback para atualização da lógica do jogo
