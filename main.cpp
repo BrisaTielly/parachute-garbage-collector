@@ -72,7 +72,7 @@ struct Basket {
     r = 0.8f;
     g = 0.8f;
     b = 0.8f; // Cor cinza claro
-    speed = 0.07f;
+    speed = 0.05f;
   }
 
   void draw() {
@@ -106,6 +106,9 @@ Basket basket;
 int score = 0;
 int windowWidth = 600;
 int windowHeight = 800;
+
+bool key_a_pressed = false;
+bool key_d_pressed = false;
 
 // --- Funções Auxiliares ---
 void updateWindowTitle() {
@@ -151,6 +154,14 @@ void display() {
 }
 
 void update(int value) {
+  if (key_a_pressed && !key_d_pressed) { // Mover para a esquerda se 'a' estiver
+                                         // pressionada e 'd' não
+    basket.move(-1.0f);
+  } else if (key_d_pressed && !key_a_pressed) { // Mover para a direita se 'd'
+                                                // estiver pressionada e 'a' não
+    basket.move(1.0f);
+  }
+
   // Atualiza a posição de todos os objetos
   for (size_t i = 0; i < objects.size(); ++i) {
     objects[i].update();
@@ -257,16 +268,38 @@ void keyboard(unsigned char key, int x, int y) {
     basket.g = 0.8f;
     basket.b = 0.8f;
     break;
-  case 'A':
-  case 'a':
-    basket.move(-1.0f); // Mover para a esquerda
+  }
+  glutPostRedisplay(); // Redesenha para mostrar a nova cor da cesta ou outras
+                       // mudanças imediatas
+}
+
+void keyboardUp(unsigned char key, int x, int y) {
+  switch (key) {}
+}
+
+// Nova função para teclas especiais (setas) pressionadas
+void specialKeyboard(int key, int x, int y) {
+  switch (key) {
+  case GLUT_KEY_LEFT:
+    key_a_pressed = true;
     break;
-  case 'D':
-  case 'd':
-    basket.move(1.0f); // Mover para a direita
+  case GLUT_KEY_RIGHT:
+    key_d_pressed = true;
     break;
   }
-  glutPostRedisplay(); // Redesenha para mostrar a nova cor da cesta
+  glutPostRedisplay();
+}
+
+// Nova função para teclas especiais (setas) soltas
+void specialKeyboardUp(int key, int x, int y) {
+  switch (key) {
+  case GLUT_KEY_LEFT:
+    key_a_pressed = false;
+    break;
+  case GLUT_KEY_RIGHT:
+    key_d_pressed = false;
+    break;
+  }
 }
 
 int main(int argc, char **argv) {
@@ -293,6 +326,12 @@ int main(int argc, char **argv) {
                             // redimensionamento da janela
   glutKeyboardFunc(
       keyboard); // Registra a função de callback para o teclado normal
+  glutKeyboardUpFunc(
+      keyboardUp); // Adicione esta linha para registrar a função de tecla solta
+  glutSpecialFunc(
+      specialKeyboard); // Registra a função para teclas especiais pressionadas
+  glutSpecialUpFunc(
+      specialKeyboardUp); // Registra a função para teclas especiais soltas
   glutTimerFunc(
       0, update,
       0); // Registra a função de callback para atualização da lógica do jogo
