@@ -12,12 +12,34 @@ float screenMaxX = 1.0f;
 // saber float screenMaxY = 1.0f; // Não usado diretamente neste exemplo, mas
 // bom saber
 
+enum COLOR {
+  BLUE = 0,
+  RED,
+  YELLOW,
+  GREEN,
+  GRAY, // Cor original da cesta
+  COLOR_COUNT  // sempre deixar este como último
+};
+
+// tabela de cores RGB, na mesma ordem do enum
+static const GLfloat COLOR_TABLE[COLOR_COUNT][3] = {
+  {0.0f, 0.0f, 1.0f}, // BLUE
+  {1.0f, 0.0f, 0.0f}, // RED
+  {1.0f, 1.0f, 0.0f}, // YELLOW
+  {0.0f, 1.0f, 0.0f},  // GREEN
+  {0.8f, 0.8f, 0.8f}   // GRAY (cor original da cesta)
+};
+
+// função inline pra pegar uma cor aleatória
+inline COLOR randomColor() {
+  return static_cast<COLOR>(rand() % (COLOR_COUNT - 1));
+}
 // Estrutura para representar um objeto caindo
 struct FallingObject {
   float x, y;    // Posição
   float size;    // Tamanho do objeto
   float speed;   // Velocidade de queda
-  float r, g, b; // Cor
+  COLOR color; // Cor
 
   FallingObject() {
     size = 0.05f; // Tamanho fixo para este exemplo
@@ -33,9 +55,7 @@ struct FallingObject {
         0.002f +
         (static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) * 0.005f;
     // Cor aleatória no respawn também
-    r = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
-    g = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
-    b = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+    color = randomColor();
   }
 
   void update() {
@@ -47,7 +67,9 @@ struct FallingObject {
   }
 
   void draw() {
-    glColor3f(r, g, b);
+    glColor3f(COLOR_TABLE[color][0],
+               COLOR_TABLE[color][1],
+               COLOR_TABLE[color][2]); // Define a cor do objeto
     glBegin(GL_QUADS);
     glVertex2f(x - size / 2, y - size / 2);
     glVertex2f(x + size / 2, y - size / 2);
@@ -61,7 +83,7 @@ struct FallingObject {
 struct Basket {
   float x, y;          // Posição do centro da cesta
   float width, height; // Dimensões da cesta
-  float r, g, b;       // Cor da cesta
+  COLOR color;         // Cor da cesta
   float speed;         // Velocidade de movimento da cesta
 
   Basket() {
@@ -69,14 +91,14 @@ struct Basket {
     height = 0.08f;
     x = 0.0f;                  // Começa no centro
     y = -0.9f + height / 2.0f; // Posição Y fixa na parte inferior
-    r = 0.8f;
-    g = 0.8f;
-    b = 0.8f; // Cor cinza claro
+    color = GRAY; // Cor original da cesta
     speed = 0.05f;
   }
 
   void draw() {
-    glColor3f(r, g, b);
+    glColor3f(COLOR_TABLE[color][0],
+               COLOR_TABLE[color][1],
+               COLOR_TABLE[color][2]); // Define a cor da cesta
     glBegin(GL_QUADS);
     glVertex2f(x - width / 2, y - height / 2);
     glVertex2f(x + width / 2, y - height / 2);
@@ -244,29 +266,19 @@ void keyboard(unsigned char key, int x, int y) {
     exit(0); // Sai do programa
     break;
   case '1': // Azul
-    basket.r = 0.0f;
-    basket.g = 0.0f;
-    basket.b = 1.0f;
+    basket.color = BLUE;
     break;
   case '2': // Vermelho
-    basket.r = 1.0f;
-    basket.g = 0.0f;
-    basket.b = 0.0f;
+    basket.color = RED;
     break;
   case '3': // Amarelo
-    basket.r = 1.0f;
-    basket.g = 1.0f;
-    basket.b = 0.0f;
+    basket.color = YELLOW;
     break;
   case '4': // Verde
-    basket.r = 0.0f;
-    basket.g = 1.0f;
-    basket.b = 0.0f;
+    basket.color = GREEN;
     break;
   case '5': // Cinza (cor original)
-    basket.r = 0.8f;
-    basket.g = 0.8f;
-    basket.b = 0.8f;
+    basket.color = GRAY;
     break;
   }
   glutPostRedisplay(); // Redesenha para mostrar a nova cor da cesta ou outras
