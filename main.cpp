@@ -107,8 +107,7 @@ struct Basket {
     glEnd();
   }
 
-  void
-  move(float direction) { // direction será -1 para esquerda, 1 para direita
+  void move(float direction) { // direction será -1 para esquerda, 1 para direita
     x += direction * speed;
 
     // Limitar o movimento da cesta dentro da tela
@@ -207,15 +206,17 @@ void update(int value) {
     // o objeto ainda não passou completamente pela cesta (seu topo está acima
     // da base da cesta)
     if (obj_right > basket_left && obj_left < basket_right &&
-        obj_bottom <= basket_top &&
-        obj_bottom >=
-            basket_bottom -
-                objects[i].size) { // A última condição evita que conte
-                                   // multiplas vezes se o objeto for muito
-                                   // rápido ou o fps baixo
-      objects[i].respawn();
-      score++;
-      updateWindowTitle();
+        obj_bottom <= basket_top && obj_bottom >= basket_bottom - objects[i].size) { 
+          // A última condição evita que conte
+          // multiplas vezes se o objeto for muito
+          // rápido ou o fps baixo
+          if (objects[i].color == basket.color) {
+            score++;
+          } else {
+            score--;
+          }
+          objects[i].respawn();
+          updateWindowTitle();
     }
   }
 
