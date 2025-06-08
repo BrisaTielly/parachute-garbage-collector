@@ -1,9 +1,16 @@
-#include <GL/glut.h>
-#include <cstdio> // Para sprintf (para exibir a pontuação no título)
-#include <cstdlib> // Para rand() e srand()
-#include <ctime>   // Para time()
-#include <string>  // Para std::to_string (alternativa para sprintf)
-#include <vector>
+#include <GL/glut.h>   
+#include <cstdio>      // Para sprintf (para formatar o texto do título)
+#include <cstdlib>     // Para rand() e srand() (geração de números aleatórios)
+#include <ctime>       // Para time() (para inicializar o gerador aleatório)
+#include <string>      // Para uso de std::string
+#include <vector>      // Para std::vector (armazenar os objetos e prédios)
+#include <cmath>       // Para funções matemáticas como sin() e cos() (animações do cenário)
+#include <algorithm>   // Para std::sort (ordenar as camadas de prédios)
+
+// --- Constantes ---
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 // --- Variáveis Globais para limites da tela ---
 float screenMinX = -1.0f;
@@ -14,71 +21,78 @@ float screenMaxX = 1.0f;
 const int MAX_NUM_OBJECTS = 4; // Máximo de objetos caindo simultaneamente
 float currentMinObjectSpeed = 0.002f;
 float currentMaxObjectSpeedOffset =
-    0.003f; // Componente aleatório da velocidade
+  0.003f; // Componente aleatório da velocidade
 
 const float INITIAL_MIN_OBJECT_SPEED = 0.008f;
 const float INITIAL_MAX_OBJECT_SPEED_OFFSET = 0.003f;
 const float MAX_MIN_OBJECT_SPEED =
-    0.005f; // Velocidade mínima máxima que um objeto pode ter
+  0.005f; // Velocidade mínima máxima que um objeto pode ter
 const float MAX_MAX_OBJECT_SPEED_OFFSET =
-    0.007f; // Offset máximo para a velocidade
+  0.007f; // Offset máximo para a velocidade
 const float SPEED_INCREASE_AMOUNT = 0.0002f;
 const float SPEED_OFFSET_INCREASE_AMOUNT = 0.0001f;
 
 int scoreForNextDifficultyIncrease =
-    5; // Pontuação para o próximo aumento de dificuldade
+  5; // Pontuação para o próximo aumento de dificuldade
 const int SCORE_INCREMENT_FOR_DIFFICULTY =
-    5; // A cada X pontos, aumenta a dificuldade
+  5; // A cada X pontos, aumenta a dificuldade
 
-enum COLOR {
-  BLUE = 0,
-  RED,
-  YELLOW,
-  GREEN,
-  GRAY, // Cor original da cesta
-  COLOR_COUNT  // sempre deixar este como último
+// Enum para os tipos de lixo
+enum WASTE_TYPE {
+  PAPER = 0,      // 0
+  PLASTIC,        // 1
+  METAL,          // 2
+  GLASS,          // 3
+  ORGANIC,        // 4
+  WASTE_TYPE_COUNT
 };
 
-// tabela de cores RGB, na mesma ordem do enum
-static const GLfloat COLOR_TABLE[COLOR_COUNT][3] = {
-  {0.0f, 0.0f, 1.0f}, // BLUE
-  {1.0f, 0.0f, 0.0f}, // RED
-  {1.0f, 1.0f, 0.0f}, // YELLOW
-  {0.0f, 1.0f, 0.0f},  // GREEN
-  {0.8f, 0.8f, 0.8f}   // GRAY (cor original da cesta)
+// Tabela de cores RGB, na mesma ordem do enum WASTE_TYPE
+static const GLfloat COLOR_TABLE[WASTE_TYPE_COUNT][3] = {
+  {0.0f, 0.5f, 0.8f},   // PAPER (Azul)
+  {0.8f, 0.2f, 0.2f},   // PLASTIC (Vermelho)
+  {0.9f, 0.8f, 0.1f},   // METAL (Amarelo)
+  {0.2f, 0.7f, 0.2f},   // GLASS (Verde)
+  {0.5f, 0.35f, 0.05f}  // ORGANIC (Marrom)
 };
 
-// função inline pra pegar uma cor aleatória
-inline COLOR randomColor() {
-  return static_cast<COLOR>(rand() % (COLOR_COUNT - 1));
-}
+// Estrutura para os prédios do cenário
+struct Building {
+  float x_pos, width, height;
+  float r, g, b;
+  int layer;
+};
+
 // Estrutura para representar um objeto caindo
 struct FallingObject {
   float x, y;    // Posição
   float size;    // Tamanho do objeto
   float speed;   // Velocidade de queda
-  COLOR color; // Cor
+  WASTE_TYPE wasteType; // Tipo de lixo
+  float rotation, rotationSpeed; // Propriedades de rotação
 
   FallingObject() {
-    size = 0.05f; // Tamanho fixo para este exemplo
-    respawn();    // Chama respawn para definir posição inicial e cor
+    size = 0.12f; // Tamanho do modelo visual
+    respawn();    // Chama respawn para definir posição inicial e tipo
   }
 
   void respawn() {
-    x = (static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) * 2.0f -
-        1.0f; // Posição X aleatória entre -1.0 e 1.0
+    x = (static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) * 2.0f - 
+        1.0f; // Posição X aleatória
     y = 1.0f + (static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) *
-                   0.5f; // Começa um pouco acima da tela
+        0.5f; // Começa um pouco acima da tela
     // Usa as velocidades dinâmicas atuais
-    speed = currentMinObjectSpeed +
-            (static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) *
-                currentMaxObjectSpeedOffset;
-    // Cor aleatória no respawn também
-    color = randomColor();
+    speed = currentMinObjectSpeed + 
+        (static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) * 
+            currentMaxObjectSpeedOffset;
+    rotation = static_cast<float>(rand() % 360);
+    rotationSpeed = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 2.0f;
+    wasteType = static_cast<WASTE_TYPE>(rand() % WASTE_TYPE_COUNT);
   }
 
   void update() {
     y -= speed;
+    rotation += rotationSpeed;
     // Se saiu da tela por baixo (não foi pego pela cesta)
     if (y < -1.0f - size) {
       respawn();
@@ -86,15 +100,38 @@ struct FallingObject {
   }
 
   void draw() {
-    glColor3f(COLOR_TABLE[color][0],
-               COLOR_TABLE[color][1],
-               COLOR_TABLE[color][2]); // Define a cor do objeto
-    glBegin(GL_QUADS);
-    glVertex2f(x - size / 2, y - size / 2);
-    glVertex2f(x + size / 2, y - size / 2);
-    glVertex2f(x + size / 2, y + size / 2);
-    glVertex2f(x - size / 2, y + size / 2);
-    glEnd();
+    glPushMatrix();
+    glTranslatef(x, y, 0.0f);
+    glRotatef(rotation, 0.0f, 0.0f, 1.0f);
+    glScalef(size, size, 1.0f);
+    switch (wasteType) {
+      case PAPER:
+        glColor3f(0.9f, 0.9f, 0.85f); glBegin(GL_QUADS); glVertex2f(-0.5f, -0.2f); glVertex2f(0.5f, -0.2f); glVertex2f(0.5f, 0.2f); glVertex2f(-0.5f, 0.2f); glEnd();
+        glColor3f(0.4f, 0.4f, 0.4f); glBegin(GL_LINES); for (int i = 0; i < 4; ++i) { float lineY = -0.15f + i * 0.1f; glVertex2f(-0.4f, lineY); glVertex2f(0.4f, lineY); } glEnd();
+        break;
+      case PLASTIC:
+        glBegin(GL_QUADS); glColor3f(0.8f, 0.2f, 0.2f); glVertex2f(-0.25f, -0.5f); glVertex2f(0.25f, -0.5f); glColor3f(1.0f, 0.5f, 0.5f); glVertex2f(0.25f, 0.2f); glVertex2f(-0.25f, 0.2f); glEnd();
+        glBegin(GL_QUADS); glVertex2f(-0.15f, 0.2f); glVertex2f(0.15f, 0.2f); glVertex2f(0.15f, 0.4f); glVertex2f(-0.15f, 0.4f); glEnd();
+        glColor3f(0.6f, 0.1f, 0.1f); glBegin(GL_QUADS); glVertex2f(-0.17f, 0.4f); glVertex2f(0.17f, 0.4f); glVertex2f(0.17f, 0.5f); glVertex2f(-0.17f, 0.5f); glEnd();
+        glColor4f(1.0f, 1.0f, 1.0f, 0.5f); glBegin(GL_QUADS); glVertex2f(-0.2f, -0.3f); glVertex2f(-0.1f, -0.3f); glVertex2f(-0.1f, 0.1f); glVertex2f(-0.2f, 0.1f); glEnd();
+        break;
+      case METAL:
+        glBegin(GL_QUAD_STRIP); glColor3f(0.6f, 0.6f, 0.65f); glVertex2f(-0.3f, -0.5f); glVertex2f(-0.3f, 0.5f); glColor3f(0.9f, 0.9f, 0.95f); glVertex2f(-0.1f, -0.5f); glVertex2f(-0.1f, 0.5f); glColor3f(0.9f, 0.9f, 0.95f); glVertex2f(0.1f, -0.5f); glVertex2f(0.1f, 0.5f); glColor3f(0.6f, 0.6f, 0.65f); glVertex2f(0.3f, -0.5f); glVertex2f(0.3f, 0.5f); glEnd();
+        glColor3f(0.5f, 0.5f, 0.55f); glBegin(GL_QUADS); glVertex2f(-0.3f, 0.5f); glVertex2f(0.3f, 0.5f); glVertex2f(0.3f, 0.4f); glVertex2f(-0.3f, 0.4f); glVertex2f(-0.3f, -0.5f); glVertex2f(0.3f, -0.5f); glVertex2f(0.3f, -0.4f); glVertex2f(-0.3f, -0.4f); glEnd();
+        break;
+      case GLASS:
+        glColor4f(0.2f, 0.7f, 0.2f, 0.7f); glBegin(GL_QUADS); glVertex2f(-0.25f, -0.5f); glVertex2f(0.25f, -0.5f); glVertex2f(0.25f, 0.1f); glVertex2f(-0.25f, 0.1f); glEnd();
+        glBegin(GL_TRIANGLES); glVertex2f(-0.25f, 0.1f); glVertex2f(0.25f, 0.1f); glVertex2f(0.15f, 0.3f); glVertex2f(-0.25f, 0.1f); glVertex2f(-0.15f, 0.3f); glVertex2f(0.15f, 0.3f); glEnd();
+        glBegin(GL_QUADS); glVertex2f(-0.1f, 0.3f); glVertex2f(0.1f, 0.3f); glVertex2f(0.1f, 0.5f); glVertex2f(-0.1f, 0.5f); glEnd();
+        glColor4f(1.0f, 1.0f, 1.0f, 0.6f); glBegin(GL_QUADS); glVertex2f(0.1f, -0.4f); glVertex2f(0.18f, -0.4f); glVertex2f(0.18f, 0.2f); glVertex2f(0.1f, 0.2f); glEnd();
+        break;
+      case ORGANIC:
+        glBegin(GL_POLYGON); glColor3f(0.9f, 0.1f, 0.1f); for (int i = 0; i < 20; i++) { float ang = 2.0f * M_PI * i / 20.0f; glVertex2f(cos(ang) * 0.4f, sin(ang) * 0.5f); } glEnd();
+        glColor3f(0.4f, 0.2f, 0.0f); glBegin(GL_QUADS); glVertex2f(-0.05f, 0.4f); glVertex2f(0.05f, 0.4f); glVertex2f(0.05f, 0.6f); glVertex2f(-0.05f, 0.6f); glEnd();
+        glColor3f(0.1f, 0.8f, 0.1f); glBegin(GL_TRIANGLES); glVertex2f(0.05f, 0.5f); glVertex2f(0.3f, 0.7f); glVertex2f(0.1f, 0.4f); glEnd();
+        break;
+    }
+    glPopMatrix();
   }
 };
 
@@ -102,33 +139,27 @@ struct FallingObject {
 struct Basket {
   float x, y;          // Posição do centro da cesta
   float width, height; // Dimensões da cesta
-  COLOR color;         // Cor da cesta
+  WASTE_TYPE wasteType; // Tipo de lixo que a cesta aceita
   float speed;         // Velocidade de movimento da cesta
 
   Basket() {
-    width = 0.25f;
-    height = 0.08f;
+    width = 0.3f;
+    height = 0.2f;
     x = 0.0f;                  // Começa no centro
-    y = -0.9f + height / 2.0f; // Posição Y fixa na parte inferior
-    color = GRAY; // Cor original da cesta
+    y = -0.8f + height / 2.0f; // Posição Y na parte inferior
+    wasteType = PAPER;         // Tipo inicial da cesta
     speed = 0.05f;
   }
 
   void draw() {
-    glColor3f(COLOR_TABLE[color][0],
-               COLOR_TABLE[color][1],
-               COLOR_TABLE[color][2]); // Define a cor da cesta
-    glBegin(GL_QUADS);
-    glVertex2f(x - width / 2, y - height / 2);
-    glVertex2f(x + width / 2, y - height / 2);
-    glVertex2f(x + width / 2, y + height / 2);
-    glVertex2f(x - width / 2, y + height / 2);
-    glEnd();
+    const float* color = COLOR_TABLE[wasteType];
+    glBegin(GL_QUADS); glColor3f(color[0] * 0.7f, color[1] * 0.7f, color[2] * 0.7f); glVertex2f(x - width / 2, y - height / 2); glVertex2f(x + width / 2, y - height / 2); glColor3f(color[0], color[1], color[2]); glVertex2f(x + width / 2, y + height / 2); glVertex2f(x - width / 2, y + height / 2); glEnd();
+    glColor3f(color[0] * 0.5f, color[1] * 0.5f, color[2] * 0.5f); glBegin(GL_QUADS); glVertex2f(x - width / 2 - 0.02f, y + height / 2); glVertex2f(x + width / 2 + 0.02f, y + height / 2); glVertex2f(x + width / 2 + 0.02f, y + height / 2 + 0.03f); glVertex2f(x - width / 2 - 0.02f, y + height / 2 + 0.03f); glEnd();
+    glColor3f(1.0f, 1.0f, 1.0f); float s = 0.05f; glPushMatrix(); glTranslatef(x, y, 0.0f); for(int i = 0; i < 3; ++i) { glRotatef(120.0, 0, 0, 1); glBegin(GL_QUADS); glVertex2f(-s, s); glVertex2f(s, s); glVertex2f(s*1.5, s*1.8); glVertex2f(-s*0.5, s*1.8); glEnd(); } glPopMatrix();
   }
 
   void move(float direction) { // direction será -1 para esquerda, 1 para direita
     x += direction * speed;
-
     // Limitar o movimento da cesta dentro da tela
     if (x - width / 2 < screenMinX) {
       x = screenMinX + width / 2;
@@ -141,6 +172,7 @@ struct Basket {
 
 // --- Variáveis Globais ---
 std::vector<FallingObject> objects;
+std::vector<Building> cityscape;
 // const int NUM_OBJECTS = 10; // Removido - agora é dinâmico
 Basket basket;
 int score = 0;
@@ -153,7 +185,7 @@ bool key_d_pressed = false;
 // --- Funções Auxiliares ---
 void updateWindowTitle() {
   char title[100];
-  sprintf(title, "Objetos Caindo - Pontos: %d", score);
+  sprintf(title, "Coleta Seletiva - Pontos: %d", score);
   glutSetWindowTitle(title);
 }
 
@@ -166,15 +198,46 @@ void renderText(float x, float y, void *font, const char *string) {
   }
 }
 
-// --- Funções OpenGL ---
+// --- Funções de Cenário ---
+void initUrbanScenery() {
+  cityscape.clear();
+  srand(1337);
+  float worldWidth = 4.0f;
+  float current_x = -worldWidth;
+  while(current_x < worldWidth) { Building b; b.x_pos = current_x; b.width = 0.2f + (static_cast<float>(rand()) / RAND_MAX) * 0.3f; b.height = 0.2f + (static_cast<float>(rand()) / RAND_MAX) * 0.6f; float gray = 0.15f + (static_cast<float>(rand()) / RAND_MAX) * 0.1f; b.r = gray; b.g = gray; b.b = gray + 0.05f; b.layer = 0; cityscape.push_back(b); current_x += b.width + 0.05f; }
+  current_x = -worldWidth;
+  while(current_x < worldWidth) { Building b; b.x_pos = current_x; b.width = 0.3f + (static_cast<float>(rand()) / RAND_MAX) * 0.2f; b.height = -0.2f + (static_cast<float>(rand()) / RAND_MAX) * 0.3f; float gray = 0.25f + (static_cast<float>(rand()) / RAND_MAX) * 0.1f; b.r = gray; b.g = gray; b.b = gray; b.layer = 1; cityscape.push_back(b); current_x += b.width + 0.1f; }
+  std::sort(cityscape.begin(), cityscape.end(), [](const Building& a, const Building& b){ return a.layer < b.layer; });
+  srand(static_cast<unsigned int>(time(0)));
+}
 
+void drawUrbanScenery() {
+  float aspect = (float)glutGet(GLUT_WINDOW_WIDTH) / (float)glutGet(GLUT_WINDOW_HEIGHT);
+  float worldLeft = -1.0, worldRight = 1.0, worldTop = 1.0, worldBottom = -1.0;
+  if (aspect > 1.0) { worldLeft = -aspect; worldRight = aspect; } else { worldTop = 1.0 / aspect; worldBottom = -1.0 / aspect; }
+  glBegin(GL_QUADS); glColor3f(0.1f, 0.1f, 0.3f); glVertex2f(worldLeft, worldTop); glVertex2f(worldRight, worldTop); glColor3f(0.9f, 0.7f, 0.4f); glVertex2f(worldRight, -0.7f); glVertex2f(worldLeft, -0.7f); glEnd();
+  int time_ms = glutGet(GLUT_ELAPSED_TIME);
+  for(const auto& b : cityscape) {
+    glColor3f(b.r, b.g, b.b); glBegin(GL_QUADS); glVertex2f(b.x_pos, -0.8f); glVertex2f(b.x_pos + b.width, -0.8f); glVertex2f(b.x_pos + b.width, b.height); glVertex2f(b.x_pos, b.height); glEnd();
+    float window_margin = 0.1f * b.width; float window_size = 0.08f * b.width; int num_floors = static_cast<int>((b.height + 0.8f) / 0.1f); int num_windows_per_floor = static_cast<int>((b.width - 2*window_margin) / (window_size*1.5f));
+    for(int i = 0; i < num_floors; ++i) { for(int j = 0; j < num_windows_per_floor; ++j) { int window_seed = static_cast<int>(b.x_pos * 100) + i * 13 + j * 7; if(sin( (time_ms / 1000.0f) * 0.2f + window_seed ) > 0.8) { glColor3f(0.9f, 0.9f, 0.6f); } else { glColor3f(b.r*0.5f, b.g*0.5f, b.b*0.5f); } float wx = b.x_pos + window_margin + j * (window_size * 1.5f); float wy = -0.75f + i * 0.1f; glBegin(GL_QUADS); glVertex2f(wx, wy); glVertex2f(wx + window_size, wy); glVertex2f(wx + window_size, wy + 0.05f); glVertex2f(wx, wy + 0.05f); glEnd(); } }
+  }
+  glColor3f(0.2f, 0.2f, 0.2f); glBegin(GL_QUADS); glVertex2f(worldLeft, -1.0f); glVertex2f(worldRight, -1.0f); glVertex2f(worldRight, -0.8f); glVertex2f(worldLeft, -0.8f); glEnd();
+}
+
+
+// --- Funções OpenGL ---
 void initGL() {
-  glClearColor(0.1f, 0.1f, 0.2f, 1.0f); // Cor de fundo azul escuro
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   updateWindowTitle(); // Define o título inicial com a pontuação
+  initUrbanScenery();
 }
 
 void display() {
   glClear(GL_COLOR_BUFFER_BIT); // Limpa o buffer de cor
+
+  drawUrbanScenery();
 
   // Desenha todos os objetos
   for (size_t i = 0; i < objects.size(); ++i) {
@@ -194,8 +257,7 @@ void display() {
 }
 
 void update(int value) {
-  if (key_a_pressed && !key_d_pressed) { // Mover para a esquerda se 'a' estiver
-                                         // pressionada e 'd' não
+  if (key_a_pressed && !key_d_pressed) { // Mover para a esquerda se 'a' estiver pressionada e 'd' não
     basket.move(-1.0f);
   } else if (key_d_pressed && !key_a_pressed) { // Mover para a direita se 'd'
                                                 // estiver pressionada e 'a' não
@@ -211,63 +273,54 @@ void update(int value) {
     float obj_right = objects[i].x + objects[i].size / 2;
     float obj_bottom = objects[i].y - objects[i].size / 2;
     float obj_top =
-        objects[i].y +
-        objects[i].size / 2; // Não usado na colisão abaixo, mas bom ter
+         objects[i].y + 
+         objects[i].size / 2; // Não usado na colisão abaixo, mas bom ter
 
     float basket_left = basket.x - basket.width / 2;
     float basket_right = basket.x + basket.width / 2;
     float basket_top = basket.y + basket.height / 2;
     float basket_bottom = basket.y - basket.height / 2;
 
-    // Condição de colisão:
+   // Condição de colisão:
     // O objeto está horizontalmente sobre a cesta E
     // a base do objeto tocou ou passou um pouco abaixo do topo da cesta E
     // o objeto ainda não passou completamente pela cesta (seu topo está acima
     // da base da cesta)
-    if (obj_right > basket_left && obj_left < basket_right &&
-        obj_bottom <= basket_top && obj_bottom >= basket_bottom - objects[i].size) { 
-          // A última condição evita que conte
+    if (obj_right > basket_left && obj_left < basket_right && obj_bottom <= basket_top && obj_bottom >= basket_bottom - objects[i].size) {
+      if (objects[i].wasteType == basket.wasteType) {
+         // A última condição evita que conte
           // multiplas vezes se o objeto for muito
           // rápido ou o fps baixo
-          if (objects[i].color == basket.color) {
-            score++;
-          } else {
-            score--;
-            if (score < 0)
-              score = 0; // Evita pontuação negativa para progressão
-          }
-          objects[i].respawn();
-          updateWindowTitle();
+        score++;
+      } else {
+        score--;
+        if (score < 0)
+          score = 0; // Evita pontuação negativa
+      }
+      objects[i].respawn();
+      updateWindowTitle();
 
-          // Lógica para aumentar a dificuldade
-          if (score >= scoreForNextDifficultyIncrease) {
-            // Aumenta a velocidade dos objetos
-            if (currentMinObjectSpeed < MAX_MIN_OBJECT_SPEED) {
-              currentMinObjectSpeed += SPEED_INCREASE_AMOUNT;
-              if (currentMinObjectSpeed > MAX_MIN_OBJECT_SPEED) {
-                currentMinObjectSpeed = MAX_MIN_OBJECT_SPEED;
-              }
-            }
-            if (currentMaxObjectSpeedOffset < MAX_MAX_OBJECT_SPEED_OFFSET) {
-              currentMaxObjectSpeedOffset += SPEED_OFFSET_INCREASE_AMOUNT;
-              if (currentMaxObjectSpeedOffset > MAX_MAX_OBJECT_SPEED_OFFSET) {
-                currentMaxObjectSpeedOffset = MAX_MAX_OBJECT_SPEED_OFFSET;
-              }
-            }
-
-            // Adiciona mais um objeto se não atingiu o máximo
-            if (objects.size() < MAX_NUM_OBJECTS) {
-              objects.push_back(FallingObject());
-            }
-
-            scoreForNextDifficultyIncrease += SCORE_INCREMENT_FOR_DIFFICULTY;
-          }
+      // Lógica para aumentar a dificuldade
+      if (score >= scoreForNextDifficultyIncrease) {
+        // Aumenta a velocidade dos objetos
+        if (currentMinObjectSpeed < MAX_MIN_OBJECT_SPEED) {
+          currentMinObjectSpeed += SPEED_INCREASE_AMOUNT;
+        }
+        if (currentMaxObjectSpeedOffset < MAX_MAX_OBJECT_SPEED_OFFSET) {
+          currentMaxObjectSpeedOffset += SPEED_OFFSET_INCREASE_AMOUNT;
+        }
+        // Adiciona mais um objeto se não atingiu o máximo
+        if (objects.size() < MAX_NUM_OBJECTS) {
+          objects.push_back(FallingObject());
+        }
+        scoreForNextDifficultyIncrease += SCORE_INCREMENT_FOR_DIFFICULTY;
+      }
     }
   }
 
   glutPostRedisplay(); // Marca a janela atual para ser redesenhada
-  glutTimerFunc(16, update,
-                0); // Chama update novamente após aprox. 16ms (visando ~60 FPS)
+  glutTimerFunc(16, update, 
+                        0); // Chama update novamente após aprox. 16ms
 }
 
 void reshape(GLsizei width, GLsizei height) {
@@ -278,7 +331,6 @@ void reshape(GLsizei width, GLsizei height) {
   float aspect = (float)width / (float)height;
 
   glViewport(0, 0, width, height);
-
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
 
@@ -287,61 +339,59 @@ void reshape(GLsizei width, GLsizei height) {
   if (width <= height) {
     screenMinX = -1.0f;
     screenMaxX = 1.0f;
-    gluOrtho2D(screenMinX, screenMaxX, -1.0f * (GLfloat)height / (GLfloat)width,
-               1.0f * (GLfloat)height / (GLfloat)width);
+    gluOrtho2D(screenMinX, screenMaxX, -1.0f / aspect, 1.0f / aspect);
   } else {
-    // screenMinY = -1.0f;
+     // screenMinY = -1.0f;
     // screenMaxY = 1.0f;
-    screenMinX = -1.0f * (GLfloat)width / (GLfloat)height;
-    screenMaxX = 1.0f * (GLfloat)width / (GLfloat)height;
+    screenMinX = -1.0f * aspect;
+    screenMaxX = 1.0f * aspect;
     gluOrtho2D(screenMinX, screenMaxX, -1.0f, 1.0f);
   }
-  // Garante que a cesta seja reposicionada corretamente se a tela for
+ // Garante que a cesta seja reposicionada corretamente se a tela for
   // redimensionada e ela sair dos limites
-  basket.move(0);
-
+  basket.move(0); // Garante que a cesta esteja dentro dos limites
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
 }
 
 void keyboard(unsigned char key, int x, int y) {
   switch (key) {
-  case 27:   // Tecla ESC
-    exit(0); // Sai do programa
-    break;
-  case '1': // Azul
-    basket.color = BLUE;
-    break;
-  case '2': // Vermelho
-    basket.color = RED;
-    break;
-  case '3': // Amarelo
-    basket.color = YELLOW;
-    break;
-  case '4': // Verde
-    basket.color = GREEN;
-    break;
-  case '5': // Cinza (cor original)
-    basket.color = GRAY;
-    break;
+    case 27:   // Tecla ESC
+      exit(0); // Sai do programa
+      break;
+    case '1': // Papel (Azul)
+      basket.wasteType = PAPER;
+      break;
+    case '2': // Plástico (Vermelho)
+      basket.wasteType = PLASTIC;
+      break;
+    case '3': // Metal (Amarelo)
+      basket.wasteType = METAL;
+      break;
+    case '4': // Vidro (Verde)
+      basket.wasteType = GLASS;
+      break;
+    case '5': // Orgânico (Marrom)
+      basket.wasteType = ORGANIC;
+      break;
   }
   glutPostRedisplay(); // Redesenha para mostrar a nova cor da cesta ou outras
                        // mudanças imediatas
 }
 
 void keyboardUp(unsigned char key, int x, int y) {
-  switch (key) {}
+    switch (key) {}
 }
 
 // Nova função para teclas especiais (setas) pressionadas
 void specialKeyboard(int key, int x, int y) {
   switch (key) {
-  case GLUT_KEY_LEFT:
-    key_a_pressed = true;
-    break;
-  case GLUT_KEY_RIGHT:
-    key_d_pressed = true;
-    break;
+    case GLUT_KEY_LEFT:
+      key_a_pressed = true;
+      break;
+    case GLUT_KEY_RIGHT:
+      key_d_pressed = true;
+      break;
   }
   glutPostRedisplay();
 }
@@ -349,18 +399,17 @@ void specialKeyboard(int key, int x, int y) {
 // Nova função para teclas especiais (setas) soltas
 void specialKeyboardUp(int key, int x, int y) {
   switch (key) {
-  case GLUT_KEY_LEFT:
-    key_a_pressed = false;
-    break;
-  case GLUT_KEY_RIGHT:
-    key_d_pressed = false;
-    break;
+    case GLUT_KEY_LEFT:
+      key_a_pressed = false;
+      break;
+    case GLUT_KEY_RIGHT:
+      key_d_pressed = false;
+      break;
   }
 }
 
 int main(int argc, char **argv) {
-  srand(static_cast<unsigned int>(
-      time(0))); // Inicializa o gerador de números aleatórios
+  srand(static_cast<unsigned int>(time(0))); // Inicializa o gerador de números aleatórios
 
   // Inicializa os objetos - começa com 1 objeto
   objects.push_back(FallingObject());
@@ -370,33 +419,29 @@ int main(int argc, char **argv) {
   currentMaxObjectSpeedOffset = INITIAL_MAX_OBJECT_SPEED_OFFSET;
 
   // A cesta é inicializada por seu construtor
-
   glutInit(&argc, argv); // Inicializa o GLUT
-  glutInitDisplayMode(GLUT_DOUBLE |
-                      GLUT_RGB); // Habilita double buffering e cores RGB
-  glutInitWindowSize(windowWidth,
-                     windowHeight); // Define o tamanho inicial da janela
-  glutInitWindowPosition(50, 50);   // Posição inicial da janela
-  // O título da janela é definido em initGL e atualizado em updateWindowTitle
-  glutCreateWindow("Objetos Caindo");
+  glutInitDisplayMode(GLUT_DOUBLE | 
+                    GLUT_RGB | 
+                    GLUT_ALPHA);
+  glutInitWindowSize(windowWidth, 
+                        windowHeight); // Define o tamanho inicial da janela
+  glutInitWindowPosition(50, 50);  // Posição inicial da janela
+   // O título da janela é definido em initGL e atualizado em updateWindowTitle
+  glutCreateWindow("Coleta Seletiva");
 
+  // Registra as funções de callback
   glutDisplayFunc(display); // Registra a função de callback para desenhar
   glutReshapeFunc(reshape); // Registra a função de callback para
                             // redimensionamento da janela
-  glutKeyboardFunc(
-      keyboard); // Registra a função de callback para o teclado normal
-  glutKeyboardUpFunc(
-      keyboardUp); // Adicione esta linha para registrar a função de tecla solta
-  glutSpecialFunc(
-      specialKeyboard); // Registra a função para teclas especiais pressionadas
-  glutSpecialUpFunc(
-      specialKeyboardUp); // Registra a função para teclas especiais soltas
+  glutKeyboardFunc(keyboard); // Registra a função de callback para o teclado normal
+  glutKeyboardUpFunc(keyboardUp); // Adicione esta linha para registrar a função de tecla solta
+  glutSpecialFunc(specialKeyboard);  // Registra a função para teclas especiais pressionadas
+  glutSpecialUpFunc(specialKeyboardUp); // Registra a função para teclas especiais soltas
   glutTimerFunc(
-      0, update,
-      0); // Registra a função de callback para atualização da lógica do jogo
+                0, update, 
+                0);  // Registra a função de callback para atualização da lógica do jogo
 
-  initGL(); // Realiza inicializações do OpenGL que não mudam
-
+  initGL(); // Realiza inicializações do OpenGL
   glutMainLoop(); // Entra no loop principal de eventos do GLUT
 
   return 0;
