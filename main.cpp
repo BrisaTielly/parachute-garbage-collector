@@ -8,9 +8,27 @@
 // --- Variáveis Globais para limites da tela ---
 float screenMinX = -1.0f;
 float screenMaxX = 1.0f;
-// float screenMinY = -1.0f; // Não usado diretamente neste exemplo, mas bom
-// saber float screenMaxY = 1.0f; // Não usado diretamente neste exemplo, mas
-// bom saber
+
+
+// --- Variáveis Globais para dificuldade dinâmica ---
+const int MAX_NUM_OBJECTS = 4; // Máximo de objetos caindo simultaneamente
+float currentMinObjectSpeed = 0.002f;
+float currentMaxObjectSpeedOffset =
+    0.003f; // Componente aleatório da velocidade
+
+const float INITIAL_MIN_OBJECT_SPEED = 0.008f;
+const float INITIAL_MAX_OBJECT_SPEED_OFFSET = 0.003f;
+const float MAX_MIN_OBJECT_SPEED =
+    0.005f; // Velocidade mínima máxima que um objeto pode ter
+const float MAX_MAX_OBJECT_SPEED_OFFSET =
+    0.007f; // Offset máximo para a velocidade
+const float SPEED_INCREASE_AMOUNT = 0.0002f;
+const float SPEED_OFFSET_INCREASE_AMOUNT = 0.0001f;
+
+int scoreForNextDifficultyIncrease =
+    5; // Pontuação para o próximo aumento de dificuldade
+const int SCORE_INCREMENT_FOR_DIFFICULTY =
+    5; // A cada X pontos, aumenta a dificuldade
 
 enum COLOR {
   BLUE = 0,
@@ -51,9 +69,10 @@ struct FallingObject {
         1.0f; // Posição X aleatória entre -1.0 e 1.0
     y = 1.0f + (static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) *
                    0.5f; // Começa um pouco acima da tela
-    speed =
-        0.002f +
-        (static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) * 0.005f;
+    // Usa as velocidades dinâmicas atuais
+    speed = currentMinObjectSpeed +
+            (static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) *
+                currentMaxObjectSpeedOffset;
     // Cor aleatória no respawn também
     color = randomColor();
   }
@@ -122,7 +141,7 @@ struct Basket {
 
 // --- Variáveis Globais ---
 std::vector<FallingObject> objects;
-const int NUM_OBJECTS = 10; // Aumentei um pouco para mais diversão
+// const int NUM_OBJECTS = 10; // Removido - agora é dinâmico
 Basket basket;
 int score = 0;
 int windowWidth = 600;
@@ -214,9 +233,35 @@ void update(int value) {
             score++;
           } else {
             score--;
+            if (score < 0)
+              score = 0; // Evita pontuação negativa para progressão
           }
           objects[i].respawn();
           updateWindowTitle();
+
+          // Lógica para aumentar a dificuldade
+          if (score >= scoreForNextDifficultyIncrease) {
+            // Aumenta a velocidade dos objetos
+            if (currentMinObjectSpeed < MAX_MIN_OBJECT_SPEED) {
+              currentMinObjectSpeed += SPEED_INCREASE_AMOUNT;
+              if (currentMinObjectSpeed > MAX_MIN_OBJECT_SPEED) {
+                currentMinObjectSpeed = MAX_MIN_OBJECT_SPEED;
+              }
+            }
+            if (currentMaxObjectSpeedOffset < MAX_MAX_OBJECT_SPEED_OFFSET) {
+              currentMaxObjectSpeedOffset += SPEED_OFFSET_INCREASE_AMOUNT;
+              if (currentMaxObjectSpeedOffset > MAX_MAX_OBJECT_SPEED_OFFSET) {
+                currentMaxObjectSpeedOffset = MAX_MAX_OBJECT_SPEED_OFFSET;
+              }
+            }
+
+            // Adiciona mais um objeto se não atingiu o máximo
+            if (objects.size() < MAX_NUM_OBJECTS) {
+              objects.push_back(FallingObject());
+            }
+
+            scoreForNextDifficultyIncrease += SCORE_INCREMENT_FOR_DIFFICULTY;
+          }
     }
   }
 
@@ -242,8 +287,6 @@ void reshape(GLsizei width, GLsizei height) {
   if (width <= height) {
     screenMinX = -1.0f;
     screenMaxX = 1.0f;
-    // screenMinY = -1.0f * (GLfloat)height / (GLfloat)width;
-    // screenMaxY = 1.0f * (GLfloat)height / (GLfloat)width;
     gluOrtho2D(screenMinX, screenMaxX, -1.0f * (GLfloat)height / (GLfloat)width,
                1.0f * (GLfloat)height / (GLfloat)width);
   } else {
@@ -319,10 +362,13 @@ int main(int argc, char **argv) {
   srand(static_cast<unsigned int>(
       time(0))); // Inicializa o gerador de números aleatórios
 
-  // Inicializa os objetos
-  for (int i = 0; i < NUM_OBJECTS; ++i) {
-    objects.push_back(FallingObject());
-  }
+  // Inicializa os objetos - começa com 1 objeto
+  objects.push_back(FallingObject());
+
+  // Inicializa as velocidades com os valores iniciais definidos
+  currentMinObjectSpeed = INITIAL_MIN_OBJECT_SPEED;
+  currentMaxObjectSpeedOffset = INITIAL_MAX_OBJECT_SPEED_OFFSET;
+
   // A cesta é inicializada por seu construtor
 
   glutInit(&argc, argv); // Inicializa o GLUT
