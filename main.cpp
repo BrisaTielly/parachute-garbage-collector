@@ -6,6 +6,8 @@
 #include <vector>      // Para std::vector (armazenar os objetos e prédios)
 #include <cmath>       // Para funções matemáticas como sin() e cos() (animações do cenário)
 #include <algorithm>   // Para std::sort (ordenar as camadas de prédios)
+#include <fstream>     // Para operações com arquivos (ranking)
+#include <sstream>     // Para std::stringstream (parse do ranking)
 
 // --- Constantes ---
 #ifndef M_PI
@@ -19,9 +21,9 @@ float screenMaxX = 1.0f;
 
 // --- Variáveis Globais para dificuldade dinâmica ---
 const int MAX_NUM_OBJECTS = 4; // Máximo de objetos caindo simultaneamente
-float currentMinObjectSpeed = 0.002f;
+float currentMinObjectSpeed = 0.004f;
 float currentMaxObjectSpeedOffset =
-  0.003f; // Componente aleatório da velocidade
+  0.003f; // Componente aleatória da velocidade
 
 const float INITIAL_MIN_OBJECT_SPEED = 0.008f;
 const float INITIAL_MAX_OBJECT_SPEED_OFFSET = 0.003f;
@@ -93,10 +95,10 @@ struct FallingObject {
   void update() {
     y -= speed;
     rotation += rotationSpeed;
-    // Se saiu da tela por baixo (não foi pego pela cesta)
-    if (y < -1.0f - size) {
-      respawn();
-    }
+    // Remova esta parte - o miss será detectado no update principal
+    // if (y < -1.0f - size) {
+    //   respawn();
+    // }
   }
 
   void draw() {
@@ -176,11 +178,24 @@ std::vector<Building> cityscape;
 // const int NUM_OBJECTS = 10; // Removido - agora é dinâmico
 Basket basket;
 int score = 0;
+int misses = 0; // Nova variável para contar misses
+const int MAX_MISSES = 8; // Máximo de misses permitidos
+bool gameOver = false; // Flag para indicar fim de jogo
 int windowWidth = 600;
 int windowHeight = 800;
 
 bool key_a_pressed = false;
 bool key_d_pressed = false;
+
+// --- Ranking System ---
+struct PlayerScore {
+  std::string name;
+  int score;
+};
+std::vector<PlayerScore> ranking;
+const std::string RANKING_FILENAME = "ranking.txt";
+const std::string PLAYER_NAME = "Jogador1"; // Nome do jogador (hardcoded)
+const int MAX_RANKING_DISPLAY_ENTRIES = 5; // Quantos scores mostrar na tela de game over
 
 // --- Funções Auxiliares ---
 void updateWindowTitle() {
@@ -197,6 +212,54 @@ void renderText(float x, float y, void *font, const char *string) {
     string++;
   }
 }
+
+// --- Funções de Ranking ---
+void loadRanking() {
+  std::ifstream inFile(RANKING_FILENAME);
+  if (!inFile.is_open()) {
+    // Arquivo não existe ou não pode ser aberto, será criado ao salvar.
+    return;
+  }
+  ranking.clear();
+  std::string line;
+  while (std::getline(inFile, line)) {
+    std::stringstream ss(line);
+    std::string name;
+    int score_val;
+    // Assume formato "Nome Score"
+    if (ss >> name >> score_val) {
+      ranking.push_back({name, score_val});
+    }
+  }
+  inFile.close();
+  std::sort(ranking.begin(), ranking.end(), [](const PlayerScore& a, const PlayerScore& b) {
+    return a.score > b.score; // Ordena em ordem decrescente de pontuação
+  });
+}
+
+void saveRanking(int finalScore) {
+  ranking.push_back({PLAYER_NAME, finalScore});
+  std::sort(ranking.begin(), ranking.end(), [](const PlayerScore& a, const PlayerScore& b) {
+    return a.score > b.score; // Ordena em ordem decrescente de pontuação
+  });
+
+  // Opcional: Limitar o número de entradas no ranking (ex: top 10)
+  // const int MAX_RANKING_ENTRIES_FILE = 10;
+  // if (ranking.size() > MAX_RANKING_ENTRIES_FILE) {
+  //   ranking.resize(MAX_RANKING_ENTRIES_FILE);
+  // }
+
+  std::ofstream outFile(RANKING_FILENAME);
+  if (!outFile.is_open()) {
+    fprintf(stderr, "Erro: Nao foi possivel salvar o ranking em %s\n", RANKING_FILENAME.c_str());
+    return;
+  }
+  for (const auto& ps : ranking) {
+    outFile << ps.name << " " << ps.score << std::endl;
+  }
+  outFile.close();
+}
+
 
 // --- Funções de Cenário ---
 void initUrbanScenery() {
@@ -237,6 +300,49 @@ void initGL() {
 void display() {
   glClear(GL_COLOR_BUFFER_BIT); // Limpa o buffer de cor
 
+  // Se o jogo acabou, mostra tela de game over
+  if (gameOver) {
+    // Desenha fundo escuro semi-transparente
+    glColor4f(0.0f, 0.0f, 0.0f, 0.7f);
+    glBegin(GL_QUADS);
+    glVertex2f(-2.0f, -2.0f);
+    glVertex2f(2.0f, -2.0f);
+    glVertex2f(2.0f, 2.0f);
+    glVertex2f(-2.0f, 2.0f);
+    glEnd();
+
+    // Texto de game over
+    glColor3f(1.0f, 0.0f, 0.0f);
+    renderText(-0.3f, 0.2f, GLUT_BITMAP_TIMES_ROMAN_24, "GAME OVER!");
+    
+    char finalScoreText[50];
+    sprintf(finalScoreText, "Pontuacao Final: %d", score);
+    glColor3f(1.0f, 1.0f, 1.0f);
+    renderText(-0.4f, 0.0f, GLUT_BITMAP_HELVETICA_18, finalScoreText);
+    
+    glColor3f(0.8f, 0.8f, 0.8f);
+    renderText(-0.3f, -0.2f, GLUT_BITMAP_HELVETICA_12, "Pressione ESC para sair");
+
+    // Mostra o Ranking
+    glColor3f(1.0f, 1.0f, 0.0f); // Amarelo para o título do ranking
+    renderText(-0.4f, -0.35f, GLUT_BITMAP_HELVETICA_18, "Ranking:");
+    
+    float rank_y_offset = -0.45f; // Ajuste a posição Y inicial
+    int rank_count = 0;
+    for (const auto& ps : ranking) {
+        if (rank_count >= MAX_RANKING_DISPLAY_ENTRIES) break; 
+        char rankEntry[100];
+        sprintf(rankEntry, "%d. %s: %d", rank_count + 1, ps.name.c_str(), ps.score);
+        glColor3f(1.0f, 1.0f, 1.0f); // Branco para as entradas do ranking
+        renderText(-0.4f, rank_y_offset, GLUT_BITMAP_HELVETICA_12, rankEntry);
+        rank_y_offset -= 0.05f; // Espaçamento entre as entradas
+        rank_count++;
+    }
+    
+    glutSwapBuffers();
+    return;
+  }
+
   drawUrbanScenery();
 
   // Desenha todos os objetos
@@ -247,16 +353,26 @@ void display() {
   // Desenha a cesta
   basket.draw();
 
-  // Desenha a pontuação na tela
+  // Desenha a pontuação e misses na tela
   char scoreText[50];
   sprintf(scoreText, "Pontos: %d", score);
   glColor3f(1.0f, 1.0f, 1.0f); // Cor branca para o texto
   renderText(-0.95f, 0.9f, GLUT_BITMAP_HELVETICA_18, scoreText);
 
+  char missesText[50];
+  sprintf(missesText, "Misses: %d/%d", misses, MAX_MISSES);
+  glColor3f(1.0f, 0.5f, 0.5f); // Cor vermelha clara para os misses
+  renderText(-0.95f, 0.85f, GLUT_BITMAP_HELVETICA_18, missesText);
+
   glutSwapBuffers(); // Troca os buffers (double buffering)
 }
 
 void update(int value) {
+  // Se o jogo acabou, não atualiza nada
+  if (gameOver) {
+    return;
+  }
+
   if (key_a_pressed && !key_d_pressed) { // Mover para a esquerda se 'a' estiver pressionada e 'd' não
     basket.move(-1.0f);
   } else if (key_d_pressed && !key_a_pressed) { // Mover para a direita se 'd'
@@ -281,21 +397,38 @@ void update(int value) {
     float basket_top = basket.y + basket.height / 2;
     float basket_bottom = basket.y - basket.height / 2;
 
-   // Condição de colisão:
-    // O objeto está horizontalmente sobre a cesta E
-    // a base do objeto tocou ou passou um pouco abaixo do topo da cesta E
-    // o objeto ainda não passou completamente pela cesta (seu topo está acima
-    // da base da cesta)
-    if (obj_right > basket_left && obj_left < basket_right && obj_bottom <= basket_top && obj_bottom >= basket_bottom - objects[i].size) {
+    // Verifica se o objeto caiu no chão (miss)
+    if (objects[i].y < -0.6f - objects[i].size) {
+      misses++;
+      objects[i].respawn();
+      
+      // Verifica se atingiu o máximo de misses
+      if (misses >= MAX_MISSES) {
+        gameOver = true;
+        saveRanking(score); // Salva o ranking quando o jogo termina por misses
+        glutPostRedisplay();
+        return;
+      }
+    }
+    // Condição de colisão:
+    else if (obj_right > basket_left && obj_left < basket_right && 
+      obj_bottom <= basket_top && obj_bottom >= basket_top - 0.05f) {
       if (objects[i].wasteType == basket.wasteType) {
          // A última condição evita que conte
           // multiplas vezes se o objeto for muito
           // rápido ou o fps baixo
         score++;
       } else {
-        score--;
-        if (score < 0)
-          score = 0; // Evita pontuação negativa
+        // Coletar objeto da cor errada também conta como miss
+        misses++;
+        if (misses >= MAX_MISSES) {
+          gameOver = true;
+          saveRanking(score); // Salva o ranking quando o jogo termina por misses na coleta
+          objects[i].respawn();
+          updateWindowTitle();
+          glutPostRedisplay();
+          return;
+        }
       }
       objects[i].respawn();
       updateWindowTitle();
@@ -337,15 +470,13 @@ void reshape(GLsizei width, GLsizei height) {
   // Ajusta as coordenadas do mundo para manter a proporção
   // e atualiza os limites da tela para a cesta
   if (width <= height) {
-    screenMinX = -1.0f;
-    screenMaxX = 1.0f;
-    gluOrtho2D(screenMinX, screenMaxX, -1.0f / aspect, 1.0f / aspect);
+    //screenMinX = -1.0f;
+    //screenMaxX = 1.0f;
+    gluOrtho2D( -1.0f, 1.0f, -1.0f / aspect, 1.0f / aspect);
   } else {
-     // screenMinY = -1.0f;
-    // screenMaxY = 1.0f;
-    screenMinX = -1.0f * aspect;
-    screenMaxX = 1.0f * aspect;
-    gluOrtho2D(screenMinX, screenMaxX, -1.0f, 1.0f);
+    // screenMinY = -1.0f * aspect
+    // screenMaxY = 1.0f * aspect;
+    gluOrtho2D(-1.0f * aspect, 1.0f * aspect, -1.0f, 1.0f);
   }
  // Garante que a cesta seja reposicionada corretamente se a tela for
   // redimensionada e ela sair dos limites
@@ -410,6 +541,7 @@ void specialKeyboardUp(int key, int x, int y) {
 
 int main(int argc, char **argv) {
   srand(static_cast<unsigned int>(time(0))); // Inicializa o gerador de números aleatórios
+  loadRanking(); // Carrega o ranking do arquivo
 
   // Inicializa os objetos - começa com 1 objeto
   objects.push_back(FallingObject());
