@@ -1,0 +1,6 @@
+Jogador1 18
+Jogador1 17
+Jogador1 15
+Jogador1 11
+Jogador1 1
+Jogador1 0

@@ -88,14 +88,14 @@ struct FallingObject {
         (static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) * 
             currentMaxObjectSpeedOffset;
     rotation = static_cast<float>(rand() % 360);
-    rotationSpeed = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 2.0f;
+    rotationSpeed = (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) - 0.5f) * 2.0f * speed * 100.0f;
     wasteType = static_cast<WASTE_TYPE>(rand() % WASTE_TYPE_COUNT);
   }
 
   void update() {
     y -= speed;
     rotation += rotationSpeed;
-    // Remova esta parte - o miss será detectado no update principal
+    // o miss será detectado no update principal
     // if (y < -1.0f - size) {
     //   respawn();
     // }
@@ -344,6 +344,36 @@ void display() {
   }
 
   drawUrbanScenery();
+
+  // --- Adicionar efeito de "blur" ao fundo ---
+  // Calcular as bordas do mundo visível com base no aspect ratio atual da janela
+  // para garantir que o quad de "blur" cubra todo o fundo.
+  // windowWidth e windowHeight são atualizados em reshape().
+  float currentAspect = (float)windowWidth / (float)windowHeight;
+  float worldLeft, worldRight, worldTop, worldBottom;
+
+  if (windowWidth <= windowHeight) { // Largura <= Altura (retrato ou quadrado)
+    worldLeft = -1.0f;
+    worldRight = 1.0f;
+    worldBottom = -1.0f / currentAspect;
+    worldTop = 1.0f / currentAspect;
+  } else { // Largura > Altura (paisagem)
+    worldLeft = -1.0f * currentAspect;
+    worldRight = 1.0f * currentAspect;
+    worldBottom = -1.0f;
+    worldTop = 1.0f;
+  }
+
+  // Desenha um quad semi-transparente sobre o cenário para dar o efeito de blur/profundidade.
+  // GL_BLEND já está habilitado em initGL().
+  glColor4f(0.1f, 0.1f, 0.1f, 0.45f); // Cor escura, semi-transparente.
+  glBegin(GL_QUADS);
+  glVertex2f(worldLeft, worldBottom);
+  glVertex2f(worldRight, worldBottom);
+  glVertex2f(worldRight, worldTop);
+  glVertex2f(worldLeft, worldTop);
+  glEnd();
+  // --- Fim do efeito de "blur" ---
 
   // Desenha todos os objetos
   for (size_t i = 0; i < objects.size(); ++i) {
