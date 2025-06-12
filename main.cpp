@@ -394,6 +394,24 @@ void display() {
   glColor3f(1.0f, 0.5f, 0.5f); // Cor vermelha clara para os misses
   renderText(-0.95f, 0.85f, GLUT_BITMAP_HELVETICA_18, missesText);
 
+  // Indicativo visual do tipo de lixo da cesta
+  glColor3f(0.5f, 0.5f, 0.5f); // Cor cinza para "Lixeira:"
+  renderText(-0.95f, 0.80f, GLUT_BITMAP_HELVETICA_18, "Lixeira: ");
+  
+  const char* wasteTypeText;
+  switch (basket.wasteType) {
+    case PAPER:   wasteTypeText = "Papel";   break;
+    case PLASTIC: wasteTypeText = "Plastico"; break;
+    case METAL:   wasteTypeText = "Metal";    break;
+    case GLASS:   wasteTypeText = "Vidro";    break;
+    case ORGANIC: wasteTypeText = "Organico"; break;
+    default:      wasteTypeText = "Desconhecido"; break;
+  }
+  
+  const GLfloat* textColor = COLOR_TABLE[basket.wasteType];
+  glColor3f(textColor[0] * 0.7f, textColor[1] * 0.7f, textColor[2] * 0.7f);
+  renderText(-0.75f, 0.80f, GLUT_BITMAP_HELVETICA_18, wasteTypeText);
+
   glutSwapBuffers(); // Troca os buffers (double buffering)
 }
 
