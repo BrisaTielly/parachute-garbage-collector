@@ -44,7 +44,56 @@ static const GLfloat COLOR_TABLE[WASTE_TYPE_COUNT][3] = {
 // Enum para alinhamento de texto na tela
 enum Alignment { ALIGN_LEFT, ALIGN_CENTER };
 
+// --- Protótipos das Funções (necessários antes da struct Button) ---
+void renderStrokeText(float x, float y, float scale, float lineWidth, const char *string, Alignment align);
+float getStrokeTextWidth(const char *string);
+
 // --- Estruturas de Dados ---
+// Estrutura para os botões do menu de pausa
+struct Button {
+    float x, y, width, height;
+    std::string text;
+    bool isHovered;
+
+    Button(float _x, float _y, float _w, float _h, const std::string& _text)
+        : x(_x), y(_y), width(_w), height(_h), text(_text), isHovered(false) {}
+
+    // Verifica se um ponto (px, py) está dentro do botão
+    bool isInside(float px, float py) const {
+        return px >= x - width / 2 && px <= x + width / 2 &&
+               py >= y - height / 2 && py <= y + height / 2;
+    }
+
+    void draw() const {
+        // Cor de fundo do botão (muda com o hover)
+        if (isHovered) {
+            glColor4f(0.8f, 0.8f, 1.0f, 0.9f);
+        } else {
+            glColor4f(0.2f, 0.2f, 0.5f, 0.85f);
+        }
+        glBegin(GL_QUADS);
+        glVertex2f(x - width / 2, y - height / 2);
+        glVertex2f(x + width / 2, y - height / 2);
+        glVertex2f(x + width / 2, y + height / 2);
+        glVertex2f(x - width / 2, y + height / 2);
+        glEnd();
+
+        // Borda do botão
+        glColor4f(1.0f, 1.0f, 1.0f, 0.9f);
+        glLineWidth(2.0f);
+        glBegin(GL_LINE_LOOP);
+        glVertex2f(x - width / 2, y - height / 2);
+        glVertex2f(x + width / 2, y - height / 2);
+        glVertex2f(x + width / 2, y + height / 2);
+        glVertex2f(x - width / 2, y + height / 2);
+        glEnd();
+
+        // Texto do botão
+        glColor3f(1.0f, 1.0f, 1.0f);
+        renderStrokeText(x, y - 0.015f, 0.0003f, 2.0f, text.c_str(), ALIGN_CENTER);
+    }
+};
+
 // Estrutura para as partículas de lixo da animação de game over
 struct TrashParticle {
   float x, y, vx, vy, rotation, rotationSpeed, size, largura, altura;
@@ -93,8 +142,13 @@ Basket basket; // A cesta do jogador
 int score = 0; // Pontuação atual
 int misses = 0; // Contagem de erros
 bool gameOver = false; // Flag que indica o fim de jogo
+bool isPaused = false; // Flag que indica que o jogo está pausado
 int windowWidth = 600, windowHeight = 800; // Dimensões da janela
 bool key_a_pressed = false, key_d_pressed = false; // Flags para controle de movimento contínuo
+
+// --- Menu de Pausa ---
+std::vector<Button> pauseButtons;
+float mouseGameX, mouseGameY; // Coordenadas do mouse no sistema do jogo
 
 // --- Dificuldade Dinâmica ---
 float currentMinObjectSpeed = INITIAL_MIN_OBJECT_SPEED;
@@ -116,8 +170,6 @@ std::vector<PlayerScore> ranking; // Vetor para armazenar os scores carregados d
 // --- Protótipos das Funções ---
 void updateWindowTitle();
 void renderBitmapText(float x, float y, void *font, const char *string);
-float getStrokeTextWidth(const char *string);
-void renderStrokeText(float x, float y, float scale, float lineWidth, const char *string, Alignment align);
 void drawRainObject(const TrashParticle& p);
 void loadRanking();
 void saveRanking(int finalScore);
@@ -125,6 +177,9 @@ void initUrbanScenery();
 void drawUrbanScenery();
 void resetGame();
 void triggerGameOver();
+void initPauseMenu();
+void drawPauseMenu();
+void convertMouseToGameCoords(int mouseX, int mouseY, float& gameX, float& gameY);
 void display();
 void update(int value);
 void reshape(GLsizei w, GLsizei h);
@@ -132,6 +187,9 @@ void keyboard(unsigned char key, int x, int y);
 void keyboardUp(unsigned char key, int x, int y);
 void specialKeyboard(int key, int x, int y);
 void specialKeyboardUp(int key, int x, int y);
+void mouseClick(int button, int state, int x, int y);
+void mousePassiveMotion(int x, int y);
+
 
 // --- Função Principal ---
 int main(int argc, char **argv) {
@@ -157,6 +215,7 @@ int main(int argc, char **argv) {
   // Inicializações do jogo
   updateWindowTitle();
   initUrbanScenery();
+  initPauseMenu();
 
   // Registra as funções de callback do GLUT
   glutDisplayFunc(display);
@@ -165,6 +224,8 @@ int main(int argc, char **argv) {
   glutKeyboardUpFunc(keyboardUp);
   glutSpecialFunc(specialKeyboard);
   glutSpecialUpFunc(specialKeyboardUp);
+  glutMouseFunc(mouseClick); // Callback para cliques do mouse
+  glutPassiveMotionFunc(mousePassiveMotion); // Callback para movimento do mouse
   glutTimerFunc(0, update, 0); // Inicia o loop de atualização do jogo
 
   glutMainLoop(); // Entra no loop principal de eventos do GLUT
@@ -390,6 +451,7 @@ void drawUrbanScenery() {
 void triggerGameOver() {
   if (!gameOver) {
     gameOver = true;
+    isPaused = false; // Garante que o jogo não fique em modo de pausa no game over
     finalScoreHolder = score; // Guarda a pontuação final para a animação
     gameOverBasketY = basket.y; // Guarda a posição inicial da cesta
     saveRanking(score); // Salva a pontuação no ranking
@@ -402,6 +464,7 @@ void resetGame() {
   score = 0;
   misses = 0;
   gameOver = false;
+  isPaused = false;
   gameOverAnimationTimer = 0.0f;
   displayedScore = 0;
   finalScoreHolder = 0;
@@ -418,6 +481,39 @@ void resetGame() {
   updateWindowTitle();
 }
 
+// Inicializa os botões do menu de pausa
+void initPauseMenu() {
+    pauseButtons.clear();
+    pauseButtons.push_back(Button(0.0f, 0.2f, 0.8f, 0.15f, "Continuar"));
+    pauseButtons.push_back(Button(0.0f, 0.0f, 0.8f, 0.15f, "Reiniciar"));
+    pauseButtons.push_back(Button(0.0f, -0.2f, 0.8f, 0.15f, "Sair do Jogo"));
+}
+
+// Desenha a tela de pausa
+void drawPauseMenu() {
+    // Desenha um overlay escuro semi-transparente
+    float aspect = (float)windowWidth / (float)windowHeight;
+    float worldLeft, worldRight, worldBottom, worldTop;
+    if (aspect > 1.0) { worldLeft = -aspect; worldRight = aspect; worldBottom = -1.0; worldTop = 1.0; }
+    else { worldLeft = -1.0; worldRight = 1.0; worldBottom = -1.0/aspect; worldTop = 1.0/aspect; }
+    glColor4f(0.0f, 0.0f, 0.0f, 0.8f);
+    glBegin(GL_QUADS);
+    glVertex2f(worldLeft, worldBottom);
+    glVertex2f(worldRight, worldBottom);
+    glVertex2f(worldRight, worldTop);
+    glVertex2f(worldLeft, worldTop);
+    glEnd();
+
+    // Título "PAUSADO"
+    glColor3f(1.0f, 1.0f, 1.0f);
+    renderStrokeText(0.0f, 0.5f, 0.0008f, 3.0f, "PAUSADO", ALIGN_CENTER);
+
+    // Desenha os botões
+    for (size_t i = 0; i < pauseButtons.size(); ++i) {
+        pauseButtons[i].draw();
+    }
+}
+
 
 // --- Funções de Callback do GLUT ---
 // Função de desenho principal, chamada a cada frame
@@ -429,7 +525,7 @@ void display() {
   if (gameOver) {
     // Calcula o progresso da animação (de 0.0 a 1.0)
     float animProgress = std::min(1.0f, gameOverAnimationTimer / GAMEOVER_ANIMATION_DURATION);
-    
+
     // Desenha a chuva de lixo da animação
     for (const auto& p : trashRain) {
       drawRainObject(p);
@@ -485,16 +581,16 @@ void display() {
 
       // Calcula a largura máxima para alinhar o ranking à esquerda
       float maxRankWidth = 0.0f;
-      for (int i = 0; i < ranking.size() && i < MAX_RANKING_DISPLAY_ENTRIES; ++i) {
-        sprintf(buffer, "%d. %s: %d", i + 1, ranking[i].name.c_str(), ranking[i].score);
+      for (size_t i = 0; i < ranking.size() && i < MAX_RANKING_DISPLAY_ENTRIES; ++i) {
+        sprintf(buffer, "%d. %s: %d", (int)i + 1, ranking[i].name.c_str(), ranking[i].score);
         float currentWidth = getStrokeTextWidth(buffer);
         if (currentWidth > maxRankWidth) maxRankWidth = currentWidth;
       }
       float rankStartX = 0.0f - (maxRankWidth / 2.0f * rankingEntryScale);
 
       bool highlighted = false; // Para destacar a pontuação do jogador atual
-      for (int i = 0; i < ranking.size() && i < MAX_RANKING_DISPLAY_ENTRIES; ++i) {
-        sprintf(buffer, "%d. %s: %d", i + 1, ranking[i].name.c_str(), ranking[i].score);
+      for (size_t i = 0; i < ranking.size() && i < MAX_RANKING_DISPLAY_ENTRIES; ++i) {
+        sprintf(buffer, "%d. %s: %d", (int)i + 1, ranking[i].name.c_str(), ranking[i].score);
         if (!highlighted && ranking[i].name == PLAYER_NAME && ranking[i].score == finalScoreHolder) {
           glColor4f(1.0f, 1.0f, 0.0f, textAlpha); highlighted = true; // Destaque em amarelo
         } else { glColor4f(1.0f, 1.0f, 1.0f, textAlpha); }
@@ -502,11 +598,12 @@ void display() {
         currentY -= lineSpacingRankingEntry;
       }
     }
-  } else { // Se o jogo está em andamento
+  } else { // Se o jogo não acabou
+    // --- LÓGICA DE DESENHO PRINCIPAL ---
     // Desenha um "blur" no cenário para destacar os objetos de jogo
     float aspect = (float)windowWidth / (float)windowHeight;
     float worldLeft, worldRight, worldBottom, worldTop;
-    if (aspect > 1.0) { worldLeft = -aspect; worldRight = aspect; worldBottom = -1.0; worldTop = 1.0; } 
+    if (aspect > 1.0) { worldLeft = -aspect; worldRight = aspect; worldBottom = -1.0; worldTop = 1.0; }
     else { worldLeft = -1.0; worldRight = 1.0; worldBottom = -1.0/aspect; worldTop = 1.0/aspect; }
     glColor4f(0.1f, 0.1f, 0.1f, 0.45f);
     glBegin(GL_QUADS);
@@ -546,12 +643,26 @@ void display() {
     const GLfloat* textColor = COLOR_TABLE[basket.wasteType];
     glColor3f(textColor[0], textColor[1], textColor[2]);
     renderBitmapText(-0.75f, 0.80f, GLUT_BITMAP_HELVETICA_18, wasteTypeText);
+    renderBitmapText(0.6f, 0.9f, GLUT_BITMAP_HELVETICA_18, "'P' para Pausar");
+
+
+    // Se o jogo estiver pausado, desenha o menu de pausa por cima de tudo
+    if (isPaused) {
+        drawPauseMenu();
+    }
   }
   glutSwapBuffers(); // Troca os buffers para exibir o que foi desenhado
 }
 
 // Função de atualização da lógica do jogo, chamada a cada ~16ms
 void update(int value) {
+  // Se o jogo está pausado, não faz nada além de agendar a próxima checagem
+  if (isPaused) {
+      glutPostRedisplay();
+      glutTimerFunc(16, update, 0);
+      return;
+  }
+
   float dt = 16.0f / 1000.0f; // Delta time
 
   if (gameOver) {
@@ -574,7 +685,7 @@ void update(int value) {
     float finalY = -0.8f + basket.width / 2.0f;
     float animProgress = fabs(gameOverBasketAngle / targetAngle);
     gameOverBasketY = initialY + (finalY - initialY) * animProgress;
-    
+
     // Gera novas partículas para a chuva de lixo
     int spawn_rate = 2;
     if (glutGet(GLUT_ELAPSED_TIME) % spawn_rate == 0 && trashRain.size() < 1200) {
@@ -596,14 +707,14 @@ void update(int value) {
     float chaoY = -0.8f;
     float friccao = 0.85f;
     float deslize = 0.05f;
-    for (int i = 0; i < trashRain.size(); ++i) {
+    for (size_t i = 0; i < trashRain.size(); ++i) {
       TrashParticle& p = trashRain[i];
       if (p.estatico) continue; // Pula partículas que já pararam
       p.vy -= gravidade; p.x += p.vx * dt; p.y += p.vy; p.rotation += p.rotationSpeed;
       bool emRepouso = false;
       if (p.y - p.altura / 2.0f <= chaoY) { p.y = chaoY + p.altura / 2.0f; emRepouso = true; }
       // Detecção de colisão entre partículas (simplificada)
-      for (int j = 0; j < trashRain.size(); ++j) {
+      for (size_t j = 0; j < trashRain.size(); ++j) {
         if (i == j) continue;
         const TrashParticle& other = trashRain[j];
         float dist_x = p.x - other.x; float dist_y = p.y - other.y;
@@ -635,7 +746,7 @@ void update(int value) {
       float obj_right = objects[i].x + objects[i].size/2;
       float obj_left = objects[i].x - objects[i].size/2;
       float obj_bottom = objects[i].y - objects[i].size * 0.5f;
-      
+
       float basket_right = basket.x + basket.width/2;
       float basket_left = basket.x - basket.width/2;
       float basket_top = basket.y + basket.height/2;
@@ -645,7 +756,7 @@ void update(int value) {
         misses++;
         objects[i].respawn();
         if (misses >= MAX_MISSES) triggerGameOver();
-      } 
+      }
       // Verifica colisão com a cesta
       else if (obj_right > basket_left && obj_left < basket_right && obj_bottom <= basket_top && objects[i].y >= basket.y) {
         if (objects[i].wasteType == basket.wasteType) {
@@ -653,7 +764,7 @@ void update(int value) {
         } else {
           if (++misses >= MAX_MISSES) triggerGameOver(); // Erro: coleta errada
         }
-        
+
         objects[i].respawn();
         updateWindowTitle();
 
@@ -689,7 +800,7 @@ void reshape(GLsizei width, GLsizei height) {
   } else {
     gluOrtho2D(-1.0f * aspect, 1.0f * aspect, -1.0f, 1.0f);
   }
-  
+
   // Garante que a cesta permaneça dentro dos limites da tela após o redimensionamento
   basket.move(0);
 
@@ -705,6 +816,15 @@ void keyboard(unsigned char key, int x, int y) {
     else if (key == 27) exit(0);
     return;
   }
+
+  // Tecla 'P' para pausar/despausar
+  if (key == 'p' || key == 'P') {
+      isPaused = !isPaused;
+      return;
+  }
+
+  // Se o jogo estiver pausado, ignora outras teclas de jogo
+  if (isPaused) return;
 
   // Durante o jogo, as teclas numéricas mudam o tipo da cesta
   switch (key) {
@@ -725,7 +845,7 @@ void keyboardUp(unsigned char key, int x, int y) {
 
 // Chamada quando uma tecla especial (setas, F1, etc.) é pressionada
 void specialKeyboard(int key, int x, int y) {
-  if (gameOver) return;
+  if (gameOver || isPaused) return; // Ignora se o jogo acabou ou está pausado
   // Ativa as flags de movimento
   switch (key) {
     case GLUT_KEY_LEFT: key_a_pressed = true; break;
@@ -738,4 +858,63 @@ void specialKeyboardUp(int key, int x, int y) {
   // Desativa as flags de movimento
   if (key == GLUT_KEY_LEFT) key_a_pressed = false;
   if (key == GLUT_KEY_RIGHT) key_d_pressed = false;
+}
+
+// Converte as coordenadas do mouse (pixels) para as coordenadas do jogo (ortho2D)
+void convertMouseToGameCoords(int mouseX, int mouseY, float& gameX, float& gameY) {
+    float aspect = (float)windowWidth / (float)windowHeight;
+    float worldLeft, worldRight, worldBottom, worldTop;
+
+    if (aspect >= 1.0f) { // Janela mais larga que alta
+        worldLeft = -aspect;
+        worldRight = aspect;
+        worldBottom = -1.0f;
+        worldTop = 1.0f;
+    } else { // Janela mais alta que larga
+        worldLeft = -1.0f;
+        worldRight = 1.0f;
+        worldBottom = -1.0f / aspect;
+        worldTop = 1.0f / aspect;
+    }
+
+    gameX = worldLeft + (mouseX / (float)windowWidth) * (worldRight - worldLeft);
+    gameY = worldTop - (mouseY / (float)windowHeight) * (worldTop - worldBottom);
+}
+
+// Chamada quando um botão do mouse é clicado
+void mouseClick(int button, int state, int x, int y) {
+    if (isPaused && button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+        convertMouseToGameCoords(x, y, mouseGameX, mouseGameY);
+
+        // Botão Continuar (índice 0)
+        if (pauseButtons[0].isInside(mouseGameX, mouseGameY)) {
+            isPaused = false;
+        }
+        // Botão Reiniciar (índice 1)
+        if (pauseButtons[1].isInside(mouseGameX, mouseGameY)) {
+            resetGame();
+        }
+        // Botão Sair (índice 2)
+        if (pauseButtons[2].isInside(mouseGameX, mouseGameY)) {
+            exit(0);
+        }
+    }
+}
+
+// Chamada quando o mouse se move sem botões pressionados
+void mousePassiveMotion(int x, int y) {
+    if (isPaused) {
+        convertMouseToGameCoords(x, y, mouseGameX, mouseGameY);
+        bool needsRedraw = false;
+        for (size_t i = 0; i < pauseButtons.size(); ++i) {
+            bool isInside = pauseButtons[i].isInside(mouseGameX, mouseGameY);
+            if (pauseButtons[i].isHovered != isInside) {
+                pauseButtons[i].isHovered = isInside;
+                needsRedraw = true;
+            }
+        }
+        if (needsRedraw) {
+            glutPostRedisplay();
+        }
+    }
 }
