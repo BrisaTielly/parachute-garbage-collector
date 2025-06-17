@@ -66,6 +66,14 @@ void update(int value) {
       basket.move(1.0f);
     }
 
+    // Sistema de spawn controlado por timer
+    spawnTimer++;
+    if (spawnTimer >= spawnDelay &&
+        objects.size() < static_cast<size_t>(MAX_NUM_OBJECTS)) {
+      objects.push_back(FallingObject());
+      spawnTimer = 0;
+    }
+
     // Atualiza objetos
     for (size_t i = 0; i < objects.size(); ++i) {
       objects[i].update();
@@ -107,16 +115,8 @@ void update(int value) {
         objects[i].respawn();
         updateWindowTitle();
 
-        // Aumenta dificuldade
-        if (score >= scoreForNextDifficultyIncrease) {
-          if (currentMinObjectSpeed < 0.015f)
-            currentMinObjectSpeed += SPEED_INCREASE_AMOUNT;
-          if (currentMaxObjectSpeedOffset < 0.01f)
-            currentMaxObjectSpeedOffset += SPEED_INCREASE_AMOUNT;
-          if (objects.size() < MAX_NUM_OBJECTS)
-            objects.push_back(FallingObject());
-          scoreForNextDifficultyIncrease += SCORE_INCREMENT_FOR_DIFFICULTY;
-        }
+        // Atualiza sistema de dificuldade
+        updateDifficulty();
       }
     }
   } else if (gameState == STATE_GAMEOVER) {

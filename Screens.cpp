@@ -1,5 +1,6 @@
 #include "Screens.h"
 #include "GameConstants.h"
+#include "GameState.h"
 #include "TextRenderer.h"
 #include <GL/glut.h>
 #include <algorithm>
@@ -194,6 +195,34 @@ void drawGamePlayScreen(const std::vector<FallingObject> &objects,
   const GLfloat *textColor = COLOR_TABLE[basket.wasteType];
   glColor3f(textColor[0], textColor[1], textColor[2]);
   renderBitmapText(-0.75f, 0.80f, GLUT_BITMAP_HELVETICA_18, wasteTypeText);
+
+  // Indicador de nível de dificuldade
+  char levelText[50];
+  sprintf(levelText, "Nivel: %d", getDifficultyLevel());
+  glColor3f(1.0f, 1.0f, 0.0f);
+  renderBitmapText(-0.95f, 0.75f, GLUT_BITMAP_HELVETICA_18, levelText);
+
+  // Barra de progresso para próximo nível (opcional)
+  float progress = static_cast<float>(score) / scoreForNextDifficultyIncrease;
+  if (progress > 1.0f)
+    progress = 1.0f;
+
+  glColor3f(0.3f, 0.3f, 0.3f);
+  glBegin(GL_QUADS);
+  glVertex2f(-0.95f, 0.70f);
+  glVertex2f(-0.55f, 0.70f);
+  glVertex2f(-0.55f, 0.72f);
+  glVertex2f(-0.95f, 0.72f);
+  glEnd();
+
+  glColor3f(0.0f, 1.0f, 0.0f);
+  glBegin(GL_QUADS);
+  glVertex2f(-0.95f, 0.70f);
+  glVertex2f(-0.95f + 0.4f * progress, 0.70f);
+  glVertex2f(-0.95f + 0.4f * progress, 0.72f);
+  glVertex2f(-0.95f, 0.72f);
+  glEnd();
+
   renderBitmapText(0.6f, 0.9f, GLUT_BITMAP_HELVETICA_18, "'P' para Pausar");
 }
 

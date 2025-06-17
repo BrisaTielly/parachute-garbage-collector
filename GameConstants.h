@@ -13,14 +13,21 @@ const int MAX_RANKING_DISPLAY_ENTRIES =
 const int MAX_PLAYER_NAME_LENGTH = 15; // Comprimento máximo do nome do jogador
 
 // Variáveis Globais para dificuldade dinâmica
-const int MAX_NUM_OBJECTS = 4; // Máximo de objetos caindo simultaneamente
-const float INITIAL_MIN_OBJECT_SPEED = 0.008f; // Velocidade mínima inicial
+const int MAX_NUM_OBJECTS =
+    6; // Máximo de objetos caindo simultaneamente (8 níveis)
+const float INITIAL_MIN_OBJECT_SPEED =
+    0.004f; // Velocidade mínima inicial (mais lenta)
 const float INITIAL_MAX_OBJECT_SPEED_OFFSET =
-    0.003f; // Componente aleatória da velocidade inicial
-const float SPEED_INCREASE_AMOUNT =
-    0.0002f; // Incremento de velocidade a cada nível
-const int SCORE_INCREMENT_FOR_DIFFICULTY =
-    5; // Pontuação necessária para aumentar a dificuldade
+    0.002f; // Componente aleatória inicial (menor)
+const float SPEED_INCREASE_RATE = 0.00015f; // Taxa de incremento de velocidade
+const float MAX_OBJECT_SPEED =
+    0.035f; // Velocidade máxima dos objetos (aumentada para 8 níveis)
+const int INITIAL_SCORE_FOR_DIFFICULTY =
+    3; // Primeiros pontos para aumentar dificuldade
+const float DIFFICULTY_SCALING_FACTOR =
+    1.4f;                            // Fator de escalonamento da dificuldade
+const int SPAWN_DELAY_INITIAL = 120; // Delay inicial entre spawns (frames)
+const int SPAWN_DELAY_MINIMUM = 30;  // Delay mínimo entre spawns
 
 // Animação
 const float GAMEOVER_ANIMATION_DURATION =

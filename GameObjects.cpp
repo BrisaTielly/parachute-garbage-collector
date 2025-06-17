@@ -1,6 +1,7 @@
 #include "GameObjects.h"
 #include "TextRenderer.h"
 #include <GL/glut.h>
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
@@ -53,21 +54,78 @@ FallingObject::FallingObject() {
 
 void FallingObject::respawn() {
   extern float currentMinObjectSpeed;
-  extern float currentMaxObjectSpeedOffset;
+  extern std::vector<FallingObject> objects;
 
-  x = (static_cast<float>(rand()) / RAND_MAX) * 2.0f - 1.0f;
-  y = 1.0f + (static_cast<float>(rand()) / RAND_MAX) * 0.5f;
-  speed = currentMinObjectSpeed +
-          (static_cast<float>(rand()) / RAND_MAX) * currentMaxObjectSpeedOffset;
+  // Registra o tempo de spawn
+  spawnTime = static_cast<float>(glutGet(GLUT_ELAPSED_TIME)) / 1000.0f;
+
+  // Evita spawn muito próximo de outros objetos
+  bool validPosition = false;
+  int attempts = 0;
+  while (!validPosition && attempts < 10) {
+    x = (static_cast<float>(rand()) / RAND_MAX) * 1.8f -
+        0.9f; // Área mais restrita
+    y = 1.0f + (static_cast<float>(rand()) / RAND_MAX) * 0.3f;
+
+    validPosition = true;
+    for (const auto &obj : objects) {
+      if (&obj != this) {
+        float dist =
+            sqrt((x - obj.x) * (x - obj.x) + (y - obj.y) * (y - obj.y));
+        if (dist < 0.3f) { // Distância mínima entre objetos
+          validPosition = false;
+          break;
+        }
+      }
+    }
+    attempts++;
+  }
+
+  // Se não encontrou posição válida, usa posição aleatória normal
+  if (!validPosition) {
+    x = (static_cast<float>(rand()) / RAND_MAX) * 2.0f - 1.0f;
+    y = 1.0f + (static_cast<float>(rand()) / RAND_MAX) * 0.5f;
+  }
+
+  // Velocidade baseada no tempo de spawn para garantir ordem
+  // Objetos spawned mais tarde nunca podem ultrapassar os anteriores
+  float baseSpeed = currentMinObjectSpeed;
+
+  // Pequena variação apenas para naturalidade visual (±2%)
+  float speedVariation =
+      (static_cast<float>(rand()) / RAND_MAX) * 0.04f - 0.02f; // -2% a +2%
+  speed = baseSpeed * (1.0f + speedVariation);
+
+  // Garantia adicional: velocidade nunca pode exceder a velocidade base
+  // para evitar qualquer possibilidade de ultrapassagem
+  if (speed > baseSpeed * 1.01f) {
+    speed = baseSpeed * 1.01f;
+  }
+
   rotation = static_cast<float>(rand() % 360);
-  rotationSpeed =
-      ((static_cast<float>(rand()) / RAND_MAX) - 0.5f) * 2.0f * speed * 100.0f;
+  rotationSpeed = ((static_cast<float>(rand()) / RAND_MAX) - 0.5f) * 1.5f *
+                  speed * 80.0f; // Rotação menos agressiva
   wasteType = static_cast<WASTE_TYPE>(rand() % WASTE_TYPE_COUNT);
 }
 
 void FallingObject::update() {
+  extern std::vector<FallingObject> objects;
+
+  // Movimento básico
   y -= speed;
   rotation += rotationSpeed;
+
+  // Failsafe: garantir que objetos spawned depois nunca ultrapassem os
+  // anteriores
+  for (const auto &other : objects) {
+    if (&other != this && other.spawnTime < spawnTime) {
+      // Se este objeto (spawned depois) está na mesma altura ou mais baixo
+      // que um objeto spawned antes, ajusta a posição
+      if (y <= other.y) {
+        y = other.y + 0.01f; // Mantém uma pequena distância
+      }
+    }
+  }
 }
 
 void FallingObject::draw() {
@@ -278,7 +336,12 @@ void Basket::draw() {
 }
 
 void Basket::move(float direction) {
-  x += direction * speed;
+  extern float difficultyMultiplier;
+
+  // Velocidade da cesta aumenta ligeiramente com a dificuldade para compensar
+  float adjustedSpeed = speed * (1.0f + difficultyMultiplier * 0.1f);
+
+  x += direction * adjustedSpeed;
   if (x - width / 2 < -1.0f) {
     x = -1.0f + width / 2;
   }

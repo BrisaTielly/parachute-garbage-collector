@@ -32,6 +32,7 @@ struct Building {
 // Estrutura para representar um objeto caindo
 struct FallingObject {
   float x, y, size, speed, rotation, rotationSpeed;
+  float spawnTime;      // Tempo de spawn para manter ordem
   WASTE_TYPE wasteType; // Tipo de lixo
 
   FallingObject();

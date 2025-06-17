@@ -26,6 +26,10 @@ extern float mouseGameX, mouseGameY;
 extern float currentMinObjectSpeed;
 extern float currentMaxObjectSpeedOffset;
 extern int scoreForNextDifficultyIncrease;
+extern int currentDifficultyLevel;
+extern int spawnDelay;
+extern int spawnTimer;
+extern float difficultyMultiplier;
 
 // Animação de Game Over
 extern std::vector<TrashParticle> trashRain;
@@ -48,5 +52,10 @@ void resetGame();
 void goToHomeScreen();
 void initPauseMenu();
 void initHomeScreen();
+
+// Funções de dificuldade
+void updateDifficulty();
+int getDifficultyLevel();
+float getDifficultyMultiplier();
 
 #endif // GAME_STATE_H

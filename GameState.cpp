@@ -2,6 +2,7 @@
 #include "AudioManager.h"
 #include "RankingSystem.h"
 #include <GL/glut.h>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 
@@ -22,7 +23,11 @@ float mouseGameX, mouseGameY;
 
 float currentMinObjectSpeed = INITIAL_MIN_OBJECT_SPEED;
 float currentMaxObjectSpeedOffset = INITIAL_MAX_OBJECT_SPEED_OFFSET;
-int scoreForNextDifficultyIncrease = 5;
+int scoreForNextDifficultyIncrease = INITIAL_SCORE_FOR_DIFFICULTY;
+int currentDifficultyLevel = 1;
+int spawnDelay = SPAWN_DELAY_INITIAL;
+int spawnTimer = 0;
+float difficultyMultiplier = 1.0f;
 
 std::vector<TrashParticle> trashRain;
 float gameOverAnimationTimer = 0.0f;
@@ -105,7 +110,11 @@ void resetGame() {
 
   currentMinObjectSpeed = INITIAL_MIN_OBJECT_SPEED;
   currentMaxObjectSpeedOffset = INITIAL_MAX_OBJECT_SPEED_OFFSET;
-  scoreForNextDifficultyIncrease = 5;
+  scoreForNextDifficultyIncrease = INITIAL_SCORE_FOR_DIFFICULTY;
+  currentDifficultyLevel = 1;
+  spawnDelay = SPAWN_DELAY_INITIAL;
+  spawnTimer = 0;
+  difficultyMultiplier = 1.0f;
 
   objects.clear();
   objects.push_back(FallingObject());
@@ -121,6 +130,54 @@ void resetGame() {
     audioManager.playMusic("gameplay");
   }
 }
+
+// Funções para gerenciamento de dificuldade
+void updateDifficulty() {
+  if (score >= scoreForNextDifficultyIncrease) {
+    currentDifficultyLevel++;
+
+    // Calcula multiplicador de dificuldade com curva mais agressiva para 8
+    // níveis
+    difficultyMultiplier = 1.0f + (currentDifficultyLevel - 1) * 0.4f;
+
+    // Aumenta velocidade gradualmente com progressão mais acentuada
+    float speedBoost =
+        SPEED_INCREASE_RATE * (1.0f + currentDifficultyLevel * 0.5f);
+    if (currentMinObjectSpeed < MAX_OBJECT_SPEED) {
+      currentMinObjectSpeed += speedBoost;
+      if (currentMinObjectSpeed > MAX_OBJECT_SPEED) {
+        currentMinObjectSpeed = MAX_OBJECT_SPEED;
+      }
+    }
+
+    if (currentMaxObjectSpeedOffset < MAX_OBJECT_SPEED * 0.5f) {
+      currentMaxObjectSpeedOffset += speedBoost * 0.5f;
+    }
+
+    // Diminui delay de spawn (aumenta taxa de spawn)
+    spawnDelay = static_cast<int>(SPAWN_DELAY_INITIAL /
+                                  (1.0f + difficultyMultiplier * 0.5f));
+    if (spawnDelay < SPAWN_DELAY_MINIMUM) {
+      spawnDelay = SPAWN_DELAY_MINIMUM;
+    }
+
+    // Adiciona objetos gradualmente (até 8 níveis)
+    int targetObjects = std::min(
+        MAX_NUM_OBJECTS, 2 + std::min(4, (currentDifficultyLevel - 1 + 1) / 2));
+    if (objects.size() < static_cast<size_t>(targetObjects)) {
+      objects.push_back(FallingObject());
+    }
+
+    // Próximo threshold de dificuldade (progressão exponencial suave)
+    scoreForNextDifficultyIncrease += static_cast<int>(
+        INITIAL_SCORE_FOR_DIFFICULTY *
+        pow(DIFFICULTY_SCALING_FACTOR, currentDifficultyLevel - 1));
+  }
+}
+
+int getDifficultyLevel() { return currentDifficultyLevel; }
+
+float getDifficultyMultiplier() { return difficultyMultiplier; }
 
 void initPauseMenu() {
   pauseButtons.clear();
