@@ -125,6 +125,8 @@ void FallingObject::draw() {
     glEnd();
     break;
   case METAL:
+    // --- INÍCIO DA ALTERAÇÃO ---
+    // Lata de metal com faixa amarela para diferenciação
     glBegin(GL_QUAD_STRIP);
     glColor3f(0.6f, 0.6f, 0.65f);
     glVertex2f(-0.3f, -0.5f);
@@ -139,6 +141,7 @@ void FallingObject::draw() {
     glVertex2f(0.3f, -0.5f);
     glVertex2f(0.3f, 0.5f);
     glEnd();
+    // Bordas superior e inferior
     glColor3f(0.5f, 0.5f, 0.55f);
     glBegin(GL_QUADS);
     glVertex2f(-0.3f, 0.5f);
@@ -150,6 +153,15 @@ void FallingObject::draw() {
     glVertex2f(0.3f, -0.4f);
     glVertex2f(-0.3f, -0.4f);
     glEnd();
+    // Faixa amarela
+    glColor3f(0.9f, 0.8f, 0.1f);
+    glBegin(GL_QUADS);
+    glVertex2f(-0.32f, 0.25f);
+    glVertex2f(0.32f, 0.25f);
+    glVertex2f(0.32f, -0.05f);
+    glVertex2f(-0.32f, -0.05f);
+    glEnd();
+    // --- FIM DA ALTERAÇÃO ---
     break;
   case GLASS:
     glColor4f(0.2f, 0.7f, 0.2f, 0.7f);
@@ -220,6 +232,10 @@ Basket::Basket() {
 }
 
 void Basket::draw() {
+  // A definição de COLOR_TABLE não está neste arquivo.
+  // Supondo que ela seja definida em outro lugar e acessível.
+  extern const GLfloat COLOR_TABLE[5][3];
+
   const float *color = COLOR_TABLE[wasteType];
 
   // Corpo da cesta com gradiente
@@ -241,9 +257,13 @@ void Basket::draw() {
   glVertex2f(-width / 2 - 0.02f, height / 2 + 0.03f);
   glEnd();
 
-  // Símbolo de reciclagem
-  glPushMatrix();
+// Símbolo de reciclagem
+    glPushMatrix();
   glColor3f(1.0f, 1.0f, 1.0f);
+  
+  // Reduz a escala do símbolo para 80% para que ele caiba na cesta
+  glScalef(0.8f, 0.8f, 1.0f); 
+
   float s = 0.05f;
   for (int i = 0; i < 3; ++i) {
     glRotatef(120.0, 0, 0, 1);
@@ -323,6 +343,8 @@ void drawRainObject(const TrashParticle &p) {
     glEnd();
     break;
   case METAL:
+    // --- INÍCIO DA ALTERAÇÃO ---
+    // Lata de metal com faixa amarela para diferenciação
     glBegin(GL_QUAD_STRIP);
     glColor3f(0.6f, 0.6f, 0.65f);
     glVertex2f(-0.3f, -0.5f);
@@ -337,6 +359,7 @@ void drawRainObject(const TrashParticle &p) {
     glVertex2f(0.3f, -0.5f);
     glVertex2f(0.3f, 0.5f);
     glEnd();
+    // Bordas superior e inferior
     glColor3f(0.5f, 0.5f, 0.55f);
     glBegin(GL_QUADS);
     glVertex2f(-0.3f, 0.5f);
@@ -348,6 +371,15 @@ void drawRainObject(const TrashParticle &p) {
     glVertex2f(0.3f, -0.4f);
     glVertex2f(-0.3f, -0.4f);
     glEnd();
+    // Faixa amarela
+    glColor3f(0.9f, 0.8f, 0.1f);
+    glBegin(GL_QUADS);
+    glVertex2f(-0.32f, 0.25f);
+    glVertex2f(0.32f, 0.25f);
+    glVertex2f(0.32f, -0.05f);
+    glVertex2f(-0.32f, -0.05f);
+    glEnd();
+    // --- FIM DA ALTERAÇÃO ---
     break;
   case GLASS:
     glColor4f(0.2f, 0.7f, 0.2f, 0.7f);
