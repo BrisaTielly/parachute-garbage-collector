@@ -4,6 +4,7 @@
 #include <ctime>
 
 // Incluir os módulos organizados
+#include "AudioManager.h"
 #include "GameConstants.h"
 #include "GameLoop.h"
 #include "GameState.h"
@@ -18,6 +19,32 @@ int main(int argc, char **argv) {
 
     // Carrega o ranking do arquivo ao iniciar o jogo
     loadRanking(ranking);
+
+    // Inicializar sistema de áudio
+    if (audioManager.initialize()) {
+      printf("Sistema de áudio inicializado com sucesso!\n");
+
+      // Carregar arquivos de música (opcional - se não existirem, o jogo
+      // continua sem áudio)
+      audioManager.loadMusic("menu", MUSIC_MENU);
+      audioManager.loadMusic("gameplay", MUSIC_GAMEPLAY);
+      audioManager.loadMusic("gameover", MUSIC_GAMEOVER);
+
+      // Carregar efeitos sonoros
+      audioManager.loadSound("collect_correct", SOUND_COLLECT_CORRECT);
+      audioManager.loadSound("collect_wrong", SOUND_COLLECT_WRONG);
+      audioManager.loadSound("button_click", SOUND_BUTTON_CLICK);
+
+      // Configurar volumes
+      audioManager.setMusicVolume(16); // Volume mais baixo para música de fundo
+      audioManager.setSoundVolume(96); // Volume médio para efeitos
+
+      // Iniciar música do menu
+      audioManager.playMusic("menu");
+    } else {
+      printf("Aviso: Sistema de áudio não pôde ser inicializado. O jogo "
+             "continuará sem som.\n");
+    }
 
     // Configurações iniciais do GLUT
     glutInit(&argc, argv);

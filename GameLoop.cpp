@@ -1,4 +1,5 @@
 #include "GameLoop.h"
+#include "AudioManager.h"
 #include "GameState.h"
 #include "Scenery.h"
 #include "Screens.h"
@@ -89,7 +90,16 @@ void update(int value) {
                obj_bottom <= basket_top && objects[i].y >= basket.y) {
         if (objects[i].wasteType == basket.wasteType) {
           score++;
+          // Som de coleta correta
+          if (audioManager.isEnabled()) {
+            audioManager.playSound("collect_correct");
+          }
         } else {
+          // Som de coleta incorreta
+          if (audioManager.isEnabled()) {
+            audioManager.playSound("collect_wrong");
+          }
+
           if (++misses >= MAX_MISSES) {
             triggerGameOver();
           }

@@ -12,9 +12,5 @@ coleta_seletiva
 # Arquivos de dados do jogo (podem variar por usuário)
 ranking.txt
 
-# Arquivos de backup
-*.bak
-main_old.cpp
-
 # Arquivos IDE
 .vscode/

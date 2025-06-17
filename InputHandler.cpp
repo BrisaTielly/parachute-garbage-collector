@@ -1,4 +1,5 @@
 #include "InputHandler.h"
+#include "AudioManager.h"
 #include "GameConstants.h"
 #include "GameState.h"
 #include <GL/glut.h>
@@ -47,6 +48,10 @@ void keyboard(unsigned char key, int x, int y) {
   case STATE_PLAYING:
     if (key == 'p' || key == 'P') {
       gameState = STATE_PAUSED;
+      // Pausar música quando o jogo é pausado
+      if (audioManager.isEnabled()) {
+        audioManager.pauseMusic();
+      }
     } else if (key == 27) {
       exit(0);
     } else if (key >= '1' && key <= '5') {
@@ -56,6 +61,10 @@ void keyboard(unsigned char key, int x, int y) {
   case STATE_PAUSED:
     if (key == 'p' || key == 'P') {
       gameState = STATE_PLAYING;
+      // Retomar música quando o jogo é despausado
+      if (audioManager.isEnabled()) {
+        audioManager.resumeMusic();
+      }
     } else if (key == 27) {
       exit(0);
     }
@@ -106,16 +115,36 @@ void mouseClick(int button, int state, int x, int y) {
   convertMouseToGameCoords(x, y, mouseGameX, mouseGameY);
 
   if (gameState == STATE_PAUSED) {
-    if (pauseButtons[0].isInside(mouseGameX, mouseGameY))
+    if (pauseButtons[0].isInside(mouseGameX, mouseGameY)) {
+      if (audioManager.isEnabled()) {
+        audioManager.playSound("button_click");
+        audioManager.resumeMusic(); // Retomar música quando voltar ao jogo
+      }
       gameState = STATE_PLAYING;
-    if (pauseButtons[1].isInside(mouseGameX, mouseGameY))
+    }
+    if (pauseButtons[1].isInside(mouseGameX, mouseGameY)) {
+      if (audioManager.isEnabled()) {
+        audioManager.playSound("button_click");
+      }
       resetGame();
-    if (pauseButtons[2].isInside(mouseGameX, mouseGameY))
+    }
+    if (pauseButtons[2].isInside(mouseGameX, mouseGameY)) {
+      if (audioManager.isEnabled()) {
+        audioManager.playSound("button_click");
+      }
       goToHomeScreen();
-    if (pauseButtons[3].isInside(mouseGameX, mouseGameY))
+    }
+    if (pauseButtons[3].isInside(mouseGameX, mouseGameY)) {
+      if (audioManager.isEnabled()) {
+        audioManager.playSound("button_click");
+      }
       exit(0);
+    }
   } else if (gameState == STATE_HOME) {
     if (homeButton.isInside(mouseGameX, mouseGameY)) {
+      if (audioManager.isEnabled()) {
+        audioManager.playSound("button_click");
+      }
       resetGame();
     }
   }
@@ -133,6 +162,7 @@ void mousePassiveMotion(int x, int y) {
         needsRedraw = true;
       }
     }
+
   } else if (gameState == STATE_HOME) {
     bool isInside = homeButton.isInside(mouseGameX, mouseGameY);
     if (homeButton.isHovered != isInside) {

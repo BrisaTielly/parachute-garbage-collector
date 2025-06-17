@@ -46,6 +46,19 @@ static const GLfloat COLOR_TABLE[WASTE_TYPE_COUNT][3] = {
 // Alinhamento de texto
 enum Alignment { ALIGN_LEFT, ALIGN_CENTER };
 
+// Constantes de Áudio
+const std::string AUDIO_DIR = "assets/audio/";
+
+// Arquivos de música
+const std::string MUSIC_MENU = AUDIO_DIR + "menu_theme.ogg";
+const std::string MUSIC_GAMEPLAY = AUDIO_DIR + "gameplay_theme.ogg";
+const std::string MUSIC_GAMEOVER = AUDIO_DIR + "gameover_theme.wav";
+
+// Arquivos de efeitos sonoros
+const std::string SOUND_COLLECT_CORRECT = AUDIO_DIR + "collect_correct.ogg";
+const std::string SOUND_COLLECT_WRONG = AUDIO_DIR + "collect_wrong.ogg";
+const std::string SOUND_BUTTON_CLICK = AUDIO_DIR + "button_click.wav";
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif

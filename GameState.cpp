@@ -1,4 +1,5 @@
 #include "GameState.h"
+#include "AudioManager.h"
 #include "RankingSystem.h"
 #include <GL/glut.h>
 #include <cstdio>
@@ -50,6 +51,12 @@ void triggerGameOver() {
   gameOverBasketY = basket.y;
   saveRanking(currentPlayerName, score, ranking);
   loadRanking(ranking);
+
+  // Trocar música para game over (tocar apenas uma vez com volume alto)
+  if (audioManager.isEnabled()) {
+    audioManager.playMusicWithVolume(
+        "gameover", 64, 0); // Volume 64 (4x maior), tocar apenas uma vez
+  }
 }
 
 void initHomeScreen() {
@@ -75,6 +82,12 @@ void goToHomeScreen() {
   loadRanking(ranking);
   homeScreenAnimationTimer = 0.0f;
   initHomeScreen();
+
+  // Trocar música para menu
+  if (audioManager.isEnabled()) {
+    audioManager.setMusicVolume(16); // Restaurar volume normal
+    audioManager.playMusic("menu");
+  }
 }
 
 void resetGame() {
@@ -101,6 +114,12 @@ void resetGame() {
 
   gameState = STATE_PLAYING;
   updateWindowTitle();
+
+  // Trocar música para gameplay
+  if (audioManager.isEnabled()) {
+    audioManager.setMusicVolume(16); // Restaurar volume normal
+    audioManager.playMusic("gameplay");
+  }
 }
 
 void initPauseMenu() {

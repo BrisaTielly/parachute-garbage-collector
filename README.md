@@ -48,27 +48,23 @@ make info         # Informações do projeto
 - **Compilador C++**: g++ ou clang++ com suporte a C++11
 - **OpenGL**: Bibliotecas de renderização gráfica
 - **GLUT**: Biblioteca para interface gráfica e entrada
+- **SDL2**: Sistema de áudio (música e efeitos sonoros)
 
 ### Instalação por Sistema Operacional
 
 #### Ubuntu/Debian
 ```bash
 sudo apt-get update
-sudo apt-get install build-essential freeglut3-dev libglu1-mesa-dev libgl1-mesa-dev
+sudo apt-get install build-essential freeglut3-dev libglu1-mesa-dev libgl1-mesa-dev libsdl2-dev libsdl2-mixer-dev
 ```
 
 #### Red Hat/CentOS/Fedora
 ```bash
 # Red Hat/CentOS
-sudo yum install gcc-c++ freeglut-devel mesa-libGL-devel mesa-libGLU-devel
+sudo yum install gcc-c++ freeglut-devel mesa-libGL-devel mesa-libGLU-devel SDL2-devel SDL2_mixer-devel
 
 # Fedora
-sudo dnf install gcc-c++ freeglut-devel mesa-libGL-devel mesa-libGLU-devel
-```
-
-#### Arch Linux
-```bash
-sudo pacman -S base-devel freeglut mesa
+sudo dnf install gcc-c++ freeglut-devel mesa-libGL-devel mesa-libGLU-devel SDL2-devel SDL2_mixer-devel
 ```
 
 #### Windows (MSYS2/MinGW)
@@ -81,6 +77,7 @@ pacman -S mingw-w64-x86_64-freeglut mingw-w64-x86_64-gcc
 ```
 src/
 ├── main.cpp              # Ponto de entrada do programa
+├── AudioManager.h/cpp    # Sistema de áudio (música e efeitos)
 ├── GameConstants.h       # Constantes globais e configurações
 ├── GameState.h/cpp       # Gerenciamento do estado global
 ├── GameLoop.h/cpp        # Loop principal e callbacks OpenGL
@@ -89,13 +86,15 @@ src/
 ├── Screens.h/cpp         # Telas (menu, jogo, pausa, game over)
 ├── TextRenderer.h/cpp    # Renderização de texto
 ├── Scenery.h/cpp         # Cenário urbano
-└── RankingSystem.h/cpp   # Sistema de pontuação persistente
+├── RankingSystem.h/cpp   # Sistema de pontuação persistente
+└── assets/audio/         # Arquivos de música e efeitos sonoros
 ```
 
 ### Módulos e Responsabilidades
 
 #### Core (Núcleo)
 - **main.cpp**: Inicialização e configuração da janela OpenGL
+- **AudioManager.h/cpp**: Sistema de áudio com SDL2/SDL_mixer
 - **GameConstants.h**: Enums, constantes e tabelas de cores
 - **GameState.h/cpp**: Estado global do jogo e variáveis compartilhadas
 
@@ -111,3 +110,10 @@ src/
 #### World (Mundo)
 - **Scenery.h/cpp**: Geração e renderização do cenário urbano
 - **RankingSystem.h/cpp**: Persistência de pontuações
+
+## Sistema de Áudio
+
+O jogo inclui trilha sonora e efeitos sonoros usando SDL2:
+- **Música de fundo**: Menu, gameplay e game over
+- **Efeitos sonoros**: Feedback para coletas e cliques
+- **Funcionamento**: O jogo funciona normalmente mesmo sem arquivos de áudio
