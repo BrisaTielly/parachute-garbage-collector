@@ -1,3 +1,113 @@
-Criação de um jogo inspirado em Parachute (1981), com foco em coleta de lixo!
+# Coleta Seletiva - Jogo de Reciclagem 
 
-g++ main.cpp -o falling_objects -lGL -lglut -lGLU  
+**Um jogo educativo em OpenGL/C++ sobre coleta seletiva de resíduos**
+
+### Compilação e Execução
+```bash
+# Instalar dependências (Ubuntu/Debian)
+make install-deps
+
+# Compilar
+make
+
+# Compilar e executar
+make run
+
+# Ver informações do projeto
+make info
+```
+
+### Comandos Disponíveis
+```bash
+make              # Compilar o projeto
+make run          # Compilar e executar
+make clean        # Limpar arquivos temporários
+make rebuild      # Limpar e recompilar
+make install-deps # Instalar dependências
+make info         # Informações do projeto
+```
+
+## Como Jogar
+
+1. **Tela Inicial**: Digite seu nome e pressione "Iniciar" ou Enter
+2. **Jogo**: 
+   - Use as setas ← → para mover a cesta
+   - Use as teclas 1-5 para mudar o tipo da cesta
+   - Colete o lixo correto na cesta da cor correspondente
+   - Pressione 'P' para pausar, ESC para sair
+3. **Tipos de Lixo**:
+   - 🟦 **Azul** - Papel
+   - 🟥 **Vermelho** - Plástico  
+   - 🟨 **Amarelo** - Metal
+   - 🟩 **Verde** - Vidro
+   - 🟫 **Marrom** - Orgânico
+
+## Requisitos do Sistema
+
+### Dependências Obrigatórias
+- **Compilador C++**: g++ ou clang++ com suporte a C++11
+- **OpenGL**: Bibliotecas de renderização gráfica
+- **GLUT**: Biblioteca para interface gráfica e entrada
+
+### Instalação por Sistema Operacional
+
+#### Ubuntu/Debian
+```bash
+sudo apt-get update
+sudo apt-get install build-essential freeglut3-dev libglu1-mesa-dev libgl1-mesa-dev
+```
+
+#### Red Hat/CentOS/Fedora
+```bash
+# Red Hat/CentOS
+sudo yum install gcc-c++ freeglut-devel mesa-libGL-devel mesa-libGLU-devel
+
+# Fedora
+sudo dnf install gcc-c++ freeglut-devel mesa-libGL-devel mesa-libGLU-devel
+```
+
+#### Arch Linux
+```bash
+sudo pacman -S base-devel freeglut mesa
+```
+
+#### Windows (MSYS2/MinGW)
+```bash
+pacman -S mingw-w64-x86_64-freeglut mingw-w64-x86_64-gcc
+```
+
+## Arquitetura do Projeto
+
+```
+src/
+├── main.cpp              # Ponto de entrada do programa
+├── GameConstants.h       # Constantes globais e configurações
+├── GameState.h/cpp       # Gerenciamento do estado global
+├── GameLoop.h/cpp        # Loop principal e callbacks OpenGL
+├── InputHandler.h/cpp    # Processamento de entrada (teclado/mouse)
+├── GameObjects.h/cpp     # Objetos do jogo (cesta, lixo)
+├── Screens.h/cpp         # Telas (menu, jogo, pausa, game over)
+├── TextRenderer.h/cpp    # Renderização de texto
+├── Scenery.h/cpp         # Cenário urbano
+└── RankingSystem.h/cpp   # Sistema de pontuação persistente
+```
+
+### Módulos e Responsabilidades
+
+#### Core (Núcleo)
+- **main.cpp**: Inicialização e configuração da janela OpenGL
+- **GameConstants.h**: Enums, constantes e tabelas de cores
+- **GameState.h/cpp**: Estado global do jogo e variáveis compartilhadas
+
+#### Jogo (Mecânicas)
+- **GameLoop.h/cpp**: Callbacks principais (display, update, reshape)
+- **InputHandler.h/cpp**: Processamento de input do usuário
+- **GameObjects.h/cpp**: Lógica de objetos (cesta, lixo, física)
+
+#### Interface
+- **Screens.h/cpp**: Renderização de todas as telas
+- **TextRenderer.h/cpp**: Sistema de renderização de texto
+
+#### World (Mundo)
+- **Scenery.h/cpp**: Geração e renderização do cenário urbano
+- **RankingSystem.h/cpp**: Persistência de pontuações
